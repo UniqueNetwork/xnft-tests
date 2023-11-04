@@ -2,6 +2,8 @@ import {ApiPromise} from '@polkadot/api';
 import {Vec} from '@polkadot/types';
 import {EventRecord, Event, XcmAssetId} from '@polkadot/types/interfaces';
 import {IKeyringPair, ISubmittableResult} from '@polkadot/types/types';
+import {nToU8a, stringToU8a} from '@polkadot/util';
+import {encodeAddress} from '@polkadot/util-crypto';
 
 export class TxResult {
   private result: ISubmittableResult;
@@ -75,9 +77,16 @@ class ChainEvent {
 
     return new class KaruraEvent {
       public get xnftAssetRegistered() {
-        return getEvent('xnft', 'RegisteredAsset').then(event => ({
+        return getEvent('xnft', 'AssetRegistered').then(event => ({
           assetId: event.data[0] as XcmAssetId,
           collectionId: event.data[1].toJSON() as number,
+        }));
+      }
+
+      public get nftCreatedClass() {
+        return getEvent('nft', 'CreatedClass').then(event => ({
+          owner: event.data[0].toString(),
+          classId: event.data[1].toJSON() as number,
         }));
       }
     };
@@ -113,11 +122,27 @@ export const waitForEvent = (api: ApiPromise, maxBlocksToWait: number = 5) => ne
       console.log(`\t... [OK] "${eventStr}" happened`);
       unsub();
       resolve(neededEvent.event);
-    } else if(waiting <= maxBlocksToWait) {
+    } else if(waiting < maxBlocksToWait) {
       waiting++;
     } else {
       unsub();
-      reject(`\t... [ERR] "${eventStr} didn't happen"`);
+      reject(`[ERR] "${eventStr} didn't happen"`);
     }
   });
 }));
+
+export const toChainAddressFormat = async (api: ApiPromise, address: string | Uint8Array) => {
+  const ss58Format = (await api.rpc.system.properties()).ss58Format.unwrap().toNumber();
+  return encodeAddress(address, ss58Format);
+};
+
+export const palletSubAccount = async (api: ApiPromise, palletId: string, sub: number) => {
+  if(palletId.length == 8) {
+    const palletIdEncoded = stringToU8a(('modl' + palletId));
+    const subEncoded = nToU8a(sub);
+    const zeroPadding = new Uint8Array(32 - palletIdEncoded.length - subEncoded.length).fill(0);
+    return await toChainAddressFormat(api, new Uint8Array([...palletIdEncoded, ...subEncoded, ...zeroPadding]));
+  } else {
+    throw Error('pallet ID length must be 8');
+  }
+};

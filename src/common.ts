@@ -4,7 +4,6 @@ import {HrmpChannel} from '@polkadot/types/interfaces';
 import {IKeyringPair} from '@polkadot/types/types';
 import {hexToString} from '@polkadot/util';
 import {sendAndWait, waitForEvent} from './util';
-import { encodeAddress } from '@polkadot/util-crypto';
 
 
 export const RELAY_URL = process.env.RELAY_URL;
@@ -73,6 +72,24 @@ export const multilocation = {
 
   karura: {
     parachain: parachainMultilocation(RELAY_KARURA_ID),
+    token: {
+      kar: {
+        parents: 1,
+        interior: {
+          X2: [
+            {
+              Parachain: RELAY_KARURA_ID,
+            },
+            {
+              GeneralKey: {
+                length: 2,
+                data: '0x0080000000000000000000000000000000000000000000000000000000000000',
+              },
+            },
+          ],
+        },
+      },
+    },
     account: (address: Uint8Array) => parachainAccountMultilocation(RELAY_KARURA_ID, address),
     nftCollection: (collectionId: number) => ({
       parents: 1,
@@ -82,7 +99,7 @@ export const multilocation = {
             Parachain: RELAY_KARURA_ID,
           },
           {
-            PalletInstance: 56,
+            PalletInstance: 121,
           },
           {
             GeneralIndex: collectionId,
@@ -103,11 +120,6 @@ const adjustToDecimals = (n: number, decimals: number) => BigInt(n) * 10n ** Big
 export const unit = {
   qtz: (n: number) => adjustToDecimals(n, decimals.quartz),
   kar: (n: number) => adjustToDecimals(n, decimals.karura),
-};
-
-export const toChainAddressFormat = async (api: ApiPromise, address: string) => {
-  const ss58Format = (await api.rpc.system.properties()).ss58Format.unwrap().toNumber();
-  return encodeAddress(address, ss58Format);
 };
 
 export const waitForParachainsStart = async (api: ApiPromise) => {
@@ -136,23 +148,54 @@ const forceOpenHrmp = async (api: ApiPromise, signer: IKeyringPair, firstParaId:
   }
 };
 
-export const registerForeignAssetOnKarura = async (api: ApiPromise, signer: IKeyringPair, metadata: {
+export const registerForeignAssetOnKarura = async (
+  api: ApiPromise,
+  signer: IKeyringPair,
+  reserveLocation: any,
+  metadata: {
     name: string,
     symbol: string,
     decimals: number,
     minimalBalance: bigint,
-}) => {
+  },
+) => {
   const assets = (await (api.query.assetRegistry.assetMetadatas.entries())).map(([_k, v]: [any, any]) =>
     hexToString(v.toJSON()['symbol'])) as string[];
 
   if(assets.includes(metadata.symbol)) {
-    console.log(`[XNFT] ${metadata.symbol} token is already registered on Karura`);
+    console.log(`[XNFT] foreign asset "${metadata.symbol}" is already registered on Karura`);
   } else {
     await sendAndWait(signer, api.tx.sudo.sudo(api.tx.assetRegistry.registerForeignAsset(
-      {V3: multilocation.quartz.parachain},
+      {V3: reserveLocation},
       metadata,
     )));
     console.log(`[XNFT] registered the "${metadata.symbol}" foreign asset on Karura`);
   }
 };
 
+export const registerForeignAssetOnQuartz = async (
+  api: ApiPromise,
+  signer: IKeyringPair,
+  reserveLocation: any,
+  metadata: {
+    name: string,
+    tokenPrefix: string,
+    mode: 'NFT' | { Fungible: number },
+  },
+) => {
+  const collectionId = (await api.query.foreignAssets.foreignReserveLocationToCollection(reserveLocation)).toJSON();
+
+  if(collectionId) {
+    console.log(`[XNFT] foreign asset "${metadata.tokenPrefix}" is already registered on Quartz`);
+  } else {
+    await sendAndWait(signer, api.tx.sudo.sudo(api.tx.foreignAssets.forceRegisterForeignAsset(
+      reserveLocation,
+      strUtf16(metadata.name),
+      metadata.tokenPrefix,
+      metadata.mode,
+    )));
+    console.log(`[XNFT] registered the "${metadata.tokenPrefix}" foreign asset on Quartz`);
+  }
+};
+
+export const strUtf16 = (string: string) => Array.from(string).map(x => x.charCodeAt(0));

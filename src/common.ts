@@ -176,20 +176,20 @@ export const registerForeignAssetOnKarura = async (
 export const registerForeignAssetOnQuartz = async (
   api: ApiPromise,
   signer: IKeyringPair,
-  reserveLocation: any,
+  assetId: any,
   metadata: {
     name: string,
     tokenPrefix: string,
     mode: 'NFT' | { Fungible: number },
   },
 ) => {
-  const collectionId = (await api.query.foreignAssets.foreignReserveLocationToCollection(reserveLocation)).toJSON();
+  const collectionId = (await api.query.foreignAssets.foreignAssetToCollection(assetId)).toJSON();
 
   if(collectionId) {
     console.log(`[XNFT] foreign asset "${metadata.tokenPrefix}" is already registered on Quartz`);
   } else {
     await sendAndWait(signer, api.tx.sudo.sudo(api.tx.foreignAssets.forceRegisterForeignAsset(
-      reserveLocation,
+      assetId,
       strUtf16(metadata.name),
       metadata.tokenPrefix,
       metadata.mode,

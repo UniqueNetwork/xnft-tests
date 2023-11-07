@@ -131,7 +131,7 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
     await registerForeignAssetOnQuartz(
       quartzApi,
       alice,
-      multilocation.karura.token.kar,
+      {Concrete: multilocation.karura.token.kar},
       {
         name: 'Karura',
         tokenPrefix: 'KAR',
@@ -159,7 +159,7 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
     const quartzCollectionId = await sendAndWait(
       alice,
       quartzApi.tx.sudo.sudo(quartzApi.tx.foreignAssets.forceRegisterForeignAsset(
-        multilocation.karura.nftCollection(karuraCollectionId),
+        {Concrete: multilocation.karura.nftCollection(karuraCollectionId)},
         strUtf16('Karura NFT'),
         'xNFT',
         'NFT',

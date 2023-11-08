@@ -40,8 +40,8 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
     await forceOpenHrmps(relayApi, alice, RELAY_QUARTZ_ID, RELAY_KARURA_ID);
   });
 
-  it('transfer Quartz NFT to Karura', async () => {
-    console.log('=== transfer Quartz NFT to Karura ===');
+  it('transfer Quartz NFT to Karura and back', async () => {
+    console.log('=== transfer Quartz NFT to Karura and back ===');
 
     await registerForeignAssetOnKarura(
       karuraApi,
@@ -82,9 +82,9 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
       .then(data => data.tokenId);
     console.log(`[XNFT] minted NFT "Quartz/Collection(#${quartzCollectionId})/NFT(#${quartzTokenId})"`);
 
-    const dest = {V3: multilocation.karura.parachain};
+    let dest: any = {V3: multilocation.karura.parachain};
     const beneficiary = {V3: multilocation.account(bob.addressRaw)};
-    const assets = {
+    let assets: any = {
       V3: [
         {
           id: {Concrete: multilocation.quartz.parachain},
@@ -96,8 +96,8 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
         },
       ],
     };
-    const feeAssetItem = 0;
-    const quartzMessageHash = await sendAndWait(bob, quartzApi.tx.polkadotXcm.limitedReserveTransferAssets(
+    let feeAssetItem = 0;
+    let quartzMessageHash = await sendAndWait(bob, quartzApi.tx.polkadotXcm.limitedReserveTransferAssets(
       dest,
       beneficiary,
       assets,
@@ -109,7 +109,7 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
     console.log(`[XNFT] sent "Quartz/Collection(#${quartzCollectionId})/NFT(#${quartzTokenId})" to Karura`);
     console.log(`\t... message hash: ${quartzMessageHash}`);
 
-    const karuraMessageHash = await waitForEvent(karuraApi).general.xcmpQueueSuccess.then(data => data.messageHash);
+    let karuraMessageHash = await waitForEvent(karuraApi).general.xcmpQueueSuccess.then(data => data.messageHash);
     expect(karuraMessageHash).to.be.equal(quartzMessageHash);
     console.log(`[XNFT] Karura received the correct message from Quartz: ${karuraMessageHash}`);
 
@@ -123,10 +123,42 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
 
     expect(derivativeNftData.owner).to.be.equal(await toChainAddressFormat(karuraApi, bob.address));
     console.log('[XNFT] the owner of the derivative NFT is correct');
+
+    assets = {
+      V3: [
+        {
+          id: {Concrete: multilocation.quartz.parachain},
+          fun: {Fungible: unit.qtz(1)},
+        },
+        {
+          id: {Concrete: multilocation.quartz.nftCollection(quartzCollectionId)},
+          fun: {NonFungible: {Index: quartzTokenId}},
+        },
+      ],
+    };
+    feeAssetItem = 0;
+    dest = {V3: multilocation.quartz.account(bob.addressRaw)};
+    karuraMessageHash = await sendAndWait(
+      bob,
+      karuraApi.tx.xTokens.transferMultiassets(
+        assets,
+        feeAssetItem,
+        dest,
+        'Unlimited',
+      ),
+    )
+      .then(result => result.extractEvent.general.xcmpQueueMessageSent)
+      .then(data => data.messageHash);
+    console.log(`[XNFT] sent "Quartz/Collection(#${quartzCollectionId})/NFT(#${quartzTokenId})" back to Quartz`);
+    console.log(`\t... message hash: ${karuraMessageHash}`);
+
+    quartzMessageHash = await waitForEvent(quartzApi).general.xcmpQueueSuccess.then(data => data.messageHash);
+    expect(karuraMessageHash).to.be.equal(quartzMessageHash);
+    console.log(`[XNFT] Quartz received the correct message from Quartz: ${quartzMessageHash}`);
   });
 
-  it('transfer Karura NFT to Quartz', async () => {
-    console.log('=== transfer Karura NFT to Quartz ===');
+  it('transfer Karura NFT to Quartz and back', async () => {
+    console.log('=== transfer Karura NFT to Quartz and back ===');
 
     await registerForeignAssetOnQuartz(
       quartzApi,
@@ -178,7 +210,7 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
         {Id: bob.address},
         karuraCollectionId,
         'xNFT',
-        emptyAttributes,
+        karuraApi.createType('BTreeMap<Bytes, Bytes>', {}),
         1,
       ),
     ));

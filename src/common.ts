@@ -3,8 +3,7 @@ import {Option} from '@polkadot/types';
 import {HrmpChannel} from '@polkadot/types/interfaces';
 import {IKeyringPair} from '@polkadot/types/types';
 import {hexToString} from '@polkadot/util';
-import {sendAndWait, waitForEvent} from './util';
-
+import {sendAndWait, waitForEvents} from './util';
 
 export const RELAY_URL = process.env.RELAY_URL;
 export const RELAY_QUARTZ_URL = process.env.RELAY_QUARTZ_URL;
@@ -127,9 +126,7 @@ export const waitForParachainsStart = async (api: ApiPromise) => {
 
   if(sessionId == 0) {
     console.log('[XNFT] parachains will start at the next relaychain session');
-
-    const maxBlocksToWait = 12;
-    await waitForEvent(api, maxBlocksToWait).general.newSession;
+    await waitForEvents(api, {maxBlocksToWait: 12}).general.newSession;
   }
 };
 

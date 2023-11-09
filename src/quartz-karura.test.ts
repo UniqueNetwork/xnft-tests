@@ -17,7 +17,7 @@ import {
   waitForParachainsStart,
 } from './common';
 import {IKeyringPair} from '@polkadot/types/types';
-import {sendAndWait, waitForEvent, toChainAddressFormat, palletSubAccount} from './util';
+import {sendAndWait, toChainAddressFormat, palletSubAccount, expectXcmpQueueSuccess} from './util';
 
 describe('cross-transfer NFTs between Quartz and Karura', () => {
   let relayApi: ApiPromise;
@@ -59,8 +59,8 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
       mode: 'NFT',
       tokenPrefix: 'xNFT',
     }))
-      .then(result => result.extractEvent.quartz.collectionCreated)
-      .then(data => data.collectionId);
+      .then(result => result.extractEvents.quartz.collectionCreated)
+      .then(events => events[0].collectionId);
     console.log(`[XNFT] created NFT collection #${quartzCollectionId} on Quartz`);
 
     const karuraCollectionId = await sendAndWait(
@@ -69,8 +69,8 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
         Concrete: multilocation.quartz.nftCollection(quartzCollectionId),
       })),
     )
-      .then(result => result.extractEvent.karura.xnftAssetRegistered)
-      .then(data => data.collectionId);
+      .then(result => result.extractEvents.karura.xnftAssetRegistered)
+      .then(events => events[0].collectionId);
     console.log(`[XNFT] registered Karura/Collection(#${karuraCollectionId}) backed by Quartz/Collection(#${quartzCollectionId})`);
 
     const quartzTokenId = await sendAndWait(alice, quartzApi.tx.unique.createItem(
@@ -78,8 +78,8 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
       {Substrate: bob.address},
       'NFT',
     ))
-      .then(result => result.extractEvent.quartz.itemCreated)
-      .then(data => data.tokenId);
+      .then(result => result.extractEvents.quartz.itemCreated)
+      .then(events => events[0].tokenId);
     console.log(`[XNFT] minted NFT "Quartz/Collection(#${quartzCollectionId})/NFT(#${quartzTokenId})"`);
 
     let dest: any = {V3: multilocation.karura.parachain};
@@ -97,21 +97,19 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
       ],
     };
     let feeAssetItem = 0;
-    let quartzMessageHash = await sendAndWait(bob, quartzApi.tx.polkadotXcm.limitedReserveTransferAssets(
+    const quartzMessageHash = await sendAndWait(bob, quartzApi.tx.polkadotXcm.limitedReserveTransferAssets(
       dest,
       beneficiary,
       assets,
       feeAssetItem,
       'Unlimited',
     ))
-      .then(result => result.extractEvent.general.xcmpQueueMessageSent)
-      .then(data => data.messageHash);
+      .then(result => result.extractEvents.general.xcmpQueueMessageSent)
+      .then(events => events[0].messageHash);
     console.log(`[XNFT] sent "Quartz/Collection(#${quartzCollectionId})/NFT(#${quartzTokenId})" to Karura`);
     console.log(`\t... message hash: ${quartzMessageHash}`);
 
-    let karuraMessageHash = await waitForEvent(karuraApi).general.xcmpQueueSuccess.then(data => data.messageHash);
-    expect(karuraMessageHash).to.be.equal(quartzMessageHash);
-    console.log(`[XNFT] Karura received the correct message from Quartz: ${karuraMessageHash}`);
+    await expectXcmpQueueSuccess(karuraApi, quartzMessageHash);
 
     const karuraTokenId = await karuraApi.query.xnft.itemsMapping(karuraCollectionId, {Index: quartzTokenId})
       .then(data => data.toJSON() as number);
@@ -137,8 +135,8 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
       ],
     };
     feeAssetItem = 0;
-    dest = {V3: multilocation.quartz.account(bob.addressRaw)};
-    karuraMessageHash = await sendAndWait(
+    dest = {V3: multilocation.quartz.account(alice.addressRaw)};
+    const karuraMessageHash = await sendAndWait(
       bob,
       karuraApi.tx.xTokens.transferMultiassets(
         assets,
@@ -147,14 +145,19 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
         'Unlimited',
       ),
     )
-      .then(result => result.extractEvent.general.xcmpQueueMessageSent)
-      .then(data => data.messageHash);
-    console.log(`[XNFT] sent "Quartz/Collection(#${quartzCollectionId})/NFT(#${quartzTokenId})" back to Quartz`);
+      .then(result => result.extractEvents.general.xcmpQueueMessageSent)
+      .then(events => events[0].messageHash);
+    console.log(`[XNFT] sent "Quartz/Collection(#${quartzCollectionId})/NFT(#${quartzTokenId})" back to Quartz to Alice`);
     console.log(`\t... message hash: ${karuraMessageHash}`);
 
-    quartzMessageHash = await waitForEvent(quartzApi).general.xcmpQueueSuccess.then(data => data.messageHash);
-    expect(karuraMessageHash).to.be.equal(quartzMessageHash);
-    console.log(`[XNFT] Quartz received the correct message from Quartz: ${quartzMessageHash}`);
+    await expectXcmpQueueSuccess(quartzApi, karuraMessageHash);
+
+    await quartzApi.query.nonfungible.owned(
+      quartzCollectionId,
+      {Substrate: alice.address},
+      quartzTokenId,
+    ).then(isOwned => expect(isOwned.toJSON()).to.be.true);
+    console.log(`[XNFT] Alice owns the returned "Quartz/Collection(#${quartzCollectionId})/NFT(#${quartzTokenId})"`);
   });
 
   it('transfer Karura NFT to Quartz and back', async () => {
@@ -178,8 +181,8 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
       enableAllCollectionFeatures,
       emptyAttributes,
     ))
-      .then(result => result.extractEvent.karura.nftCreatedClass)
-      .then(data => data.classId);
+      .then(result => result.extractEvents.karura.nftCreatedClass)
+      .then(events => events[0].classId);
     const karuraCollectionAccount = await palletSubAccount(karuraApi, 'aca/aNFT', karuraCollectionId);
 
     console.log(`[XNFT] created NFT collection #${karuraCollectionId} on Karura`);
@@ -197,8 +200,8 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
         'NFT',
       )),
     )
-      .then(result => result.extractEvent.quartz.collectionCreated)
-      .then(data => data.collectionId);
+      .then(result => result.extractEvents.quartz.collectionCreated)
+      .then(events => events[0].collectionId);
 
     console.log(`[XNFT] registered "Quartz/Collection(#${quartzCollectionId})" backed by "Karura/Collection(#${karuraCollectionId})"`);
 
@@ -210,17 +213,17 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
         {Id: bob.address},
         karuraCollectionId,
         'xNFT',
-        karuraApi.createType('BTreeMap<Bytes, Bytes>', {}),
+        emptyAttributes,
         1,
       ),
     ));
     console.log(`[XNFT] minted NFT "Karura/Collection(#${karuraCollectionId})/NFT(#${karuraTokenId})"`);
 
-    const assets = {
+    let assets: any = {
       V3: [
         {
           id: {Concrete: multilocation.karura.token.kar},
-          fun: {Fungible: unit.kar(10)},
+          fun: {Fungible: unit.kar(1)},
         },
         {
           id: {Concrete: multilocation.karura.nftCollection(karuraCollectionId)},
@@ -228,22 +231,20 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
         },
       ],
     };
-    const feeAssetItem = 0;
-    const dest = {V3: multilocation.quartz.account(bob.addressRaw)};
+    let feeAssetItem = 0;
+    let dest: any = {V3: multilocation.quartz.account(bob.addressRaw)};
     const karuraMessageHash = await sendAndWait(bob, karuraApi.tx.xTokens.transferMultiassets(
       assets,
       feeAssetItem,
       dest,
       'Unlimited',
     ))
-      .then(result => result.extractEvent.general.xcmpQueueMessageSent)
-      .then(data => data.messageHash);
+      .then(result => result.extractEvents.general.xcmpQueueMessageSent)
+      .then(events => events[0].messageHash);
     console.log(`[XNFT] sent "Karura/Collection(#${karuraCollectionId})/NFT(#${karuraTokenId})" to Karura`);
     console.log(`\t... message hash: ${karuraMessageHash}`);
 
-    const quartzMessageHash = await waitForEvent(quartzApi).general.xcmpQueueSuccess.then(data => data.messageHash);
-    expect(karuraMessageHash).to.be.equal(quartzMessageHash);
-    console.log(`[XNFT] Quartz received the correct message from Karura: ${quartzMessageHash}`);
+    await expectXcmpQueueSuccess(quartzApi, karuraMessageHash);
 
     const quartzTokenId = await quartzApi.query.foreignAssets.foreignReserveAssetInstanceToTokenId(
       quartzCollectionId,
@@ -258,6 +259,42 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
       quartzTokenId,
     ).then(isOwned => expect(isOwned.toJSON()).to.be.true);
     console.log('[XNFT] the owner of the derivative NFT is correct');
+
+    assets = {
+      V3: [
+        {
+          id: {Concrete: multilocation.karura.token.kar},
+          fun: {Fungible: unit.kar(1)},
+        },
+        {
+          id: {Concrete: multilocation.karura.nftCollection(karuraCollectionId)},
+          fun: {NonFungible: {Index: karuraTokenId}},
+        },
+      ],
+    };
+    feeAssetItem = 0;
+    dest = {V3: multilocation.karura.account(alice.addressRaw)};
+    const quartzMessageHash = await sendAndWait(
+      bob,
+      quartzApi.tx.xTokens.transferMultiassets(
+        assets,
+        feeAssetItem,
+        dest,
+        'Unlimited',
+      ),
+    )
+      .then(result => result.extractEvents.general.xcmpQueueMessageSent)
+      .then(events => events[0].messageHash);
+    console.log(`[XNFT] sent "Karura/Collection(#${karuraCollectionId})/NFT(#${karuraTokenId})" back to Karura to Alice`);
+    console.log(`\t... message hash: ${quartzMessageHash}`);
+
+    await expectXcmpQueueSuccess(karuraApi, quartzMessageHash);
+
+    const karuraTokenData: any = await karuraApi.query.ormlNFT.tokens(karuraCollectionId, karuraTokenId)
+      .then(data => data.toJSON());
+
+    expect(karuraTokenData.owner).to.be.equal(await toChainAddressFormat(karuraApi, alice.address));
+    console.log(`[XNFT] Alice owns the returned "Karura/Collection(#${karuraCollectionId})/NFT(#${karuraTokenId})"`);
   });
 
   after(async () => {

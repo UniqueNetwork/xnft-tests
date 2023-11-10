@@ -7,7 +7,7 @@ local dotenv = {
 
 function(prev, repoDir)
 (import 'baedeker-library/ops/rewrites.libsonnet').rewriteNodePaths({
-	'bin/polkadot':{dockerImage:'uniquenetwork/builder-polkadot:%s' % dotenv.POLKADOT_MAINNET_BRANCH},
+	'bin/polkadot':{dockerImage:'uniquenetwork/builder-polkadot:%s' % dotenv.RELAY_POLKADOT_BRANCH},
 	'bin/unique':'%s/target/release/unique-collator' % dotenv.UNIQUE_CHAIN_REPO,
 	'bin/acala':'%s/target/release/acala' % dotenv.ACALA_CHAIN_REPO,
 })(prev)

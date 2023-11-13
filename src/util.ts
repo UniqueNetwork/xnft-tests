@@ -148,9 +148,17 @@ export const waitForEvents = (
   console.log(`[XNFT] ${chain}: waiting for the event "${eventStr}"`);
 
   let waiting = 1;
+  let lastBlockNumber = 0;
 
   const unsub = await api.rpc.chain.subscribeNewHeads(async header => {
-    console.log(`\t... [attempt ${waiting}/${maxBlocksToWait}] block #${header.number.toNumber()}`);
+    const blockNumber = header.number.toNumber();
+    if(blockNumber > lastBlockNumber) {
+      lastBlockNumber = blockNumber;
+    } else {
+      return;
+    }
+
+    console.log(`\t... [attempt ${waiting}/${maxBlocksToWait}] block #${blockNumber}`);
 
     const eventRecords = await api.query.system.events() as Vec<EventRecord>;
     const neededRecords = eventRecords.filter(eventRecord => eventRecord.event.section == section && eventRecord.event.method == method);
@@ -184,9 +192,17 @@ export const searchEvents = <T> (
   const maxBlocksToWait = options.maxBlocksToWait ?? 5;
 
   let waiting = 1;
+  let lastBlockNumber = 0;
 
   const unsub = await api.rpc.chain.subscribeNewHeads(async header => {
-    const msgPrefix = `\t... [attempt ${waiting}/${maxBlocksToWait}] block #${header.number.toNumber()}`;
+    const blockNumber = header.number.toNumber();
+    if(blockNumber > lastBlockNumber) {
+      lastBlockNumber = blockNumber;
+    } else {
+      return;
+    }
+
+    const msgPrefix = `\t... [attempt ${waiting}/${maxBlocksToWait}] block #${blockNumber}`;
 
     const eventRecords = await api.query.system.events() as Vec<EventRecord>;
 

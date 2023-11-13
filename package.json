@@ -6,7 +6,10 @@
   "scripts": {
     "lint": "eslint --ext .ts,.js src/",
     "fix": "yarn lint --fix",
-    "quartz-karura": "mocha --timeout 9999999 ./src/quartz-karura.test.ts"
+    "_test": "mocha --timeout 9999999",
+    "quartz-karura": "yarn _test ./src/quartz-karura.test.ts",
+    "all-quartz": "yarn _test ./src/*quartz*.test.ts",
+    "all-karura": "yarn _test ./src/*karura*.test.ts"
   },
   "license": "GPL-3.0-or-later",
   "type": "module",

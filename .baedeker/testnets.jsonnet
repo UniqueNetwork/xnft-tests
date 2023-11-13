@@ -23,7 +23,7 @@ local relay = {
 
 local quartz = {
 	name: 'quartz',
-	bin: 'bin/unique',
+	bin: 'bin/quartz',
 	paraId: 1001,
 	spec: {Genesis:{
 		modify:: m.genericPara($),
@@ -39,7 +39,7 @@ local quartz = {
 
 local karura = {
 	name: 'karura',
-	bin: 'bin/acala',
+	bin: 'bin/karura',
 	paraId: 1002,
 	spec: {Genesis:{
 		chain: 'karura-dev',

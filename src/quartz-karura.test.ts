@@ -82,25 +82,25 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
       .then(events => events[0].tokenId);
     console.log(`[XNFT] minted NFT "Quartz/Collection(#${quartzCollectionId})/NFT(#${quartzTokenId})"`);
 
-    let dest: any = {V3: multilocation.karura.account(bob.addressRaw)};
-    let assets: any = {
-      V3: [
-        {
-          id: {Concrete: multilocation.quartz.parachain},
-          fun: {Fungible: unit.qtz(10)},
-        },
-        {
-          id: {Concrete: multilocation.quartz.nftCollection(quartzCollectionId)},
-          fun: {NonFungible: {Index: quartzTokenId}},
-        },
-      ],
+    const xnft = {
+      V3: {
+        id: {Concrete: multilocation.quartz.nftCollection(quartzCollectionId)},
+        fun: {NonFungible: {Index: quartzTokenId}},
+      },
     };
-    let feeAssetItem = 0;
+
+    let fee = {
+      V3: {
+        id: {Concrete: multilocation.quartz.parachain},
+        fun: {Fungible: unit.qtz(10)},
+      },
+    };
+    let dest = {V3: multilocation.karura.account(bob.addressRaw)};
     const quartzMessageHash = await sendAndWait(
       bob,
-      quartzApi.tx.xTokens.transferMultiassets(
-        assets,
-        feeAssetItem,
+      quartzApi.tx.xTokens.transferMultiassetWithFee(
+        xnft,
+        fee,
         dest,
         'Unlimited',
       ),
@@ -123,25 +123,18 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
     expect(derivativeNftData.owner).to.be.equal(await toChainAddressFormat(karuraApi, bob.address));
     console.log('[XNFT] the owner of the derivative NFT is correct');
 
-    assets = {
-      V3: [
-        {
-          id: {Concrete: multilocation.quartz.parachain},
-          fun: {Fungible: unit.qtz(1)},
-        },
-        {
-          id: {Concrete: multilocation.quartz.nftCollection(quartzCollectionId)},
-          fun: {NonFungible: {Index: quartzTokenId}},
-        },
-      ],
+    fee = {
+      V3: {
+        id: {Concrete: multilocation.quartz.parachain},
+        fun: {Fungible: unit.qtz(1)},
+      },
     };
-    feeAssetItem = 0;
     dest = {V3: multilocation.quartz.account(alice.addressRaw)};
     const karuraMessageHash = await sendAndWait(
       bob,
-      karuraApi.tx.xTokens.transferMultiassets(
-        assets,
-        feeAssetItem,
+      karuraApi.tx.xTokens.transferMultiassetWithFee(
+        xnft,
+        fee,
         dest,
         'Unlimited',
       ),
@@ -220,26 +213,29 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
     ));
     console.log(`[XNFT] minted NFT "Karura/Collection(#${karuraCollectionId})/NFT(#${karuraTokenId})"`);
 
-    let assets: any = {
-      V3: [
-        {
-          id: {Concrete: multilocation.karura.token.kar},
-          fun: {Fungible: unit.kar(1)},
-        },
-        {
-          id: {Concrete: multilocation.karura.nftCollection(karuraCollectionId)},
-          fun: {NonFungible: {Index: karuraTokenId}},
-        },
-      ],
+    const xnft = {
+      V3: {
+        id: {Concrete: multilocation.karura.nftCollection(karuraCollectionId)},
+        fun: {NonFungible: {Index: karuraTokenId}},
+      },
     };
-    let feeAssetItem = 0;
-    let dest: any = {V3: multilocation.quartz.account(bob.addressRaw)};
-    const karuraMessageHash = await sendAndWait(bob, karuraApi.tx.xTokens.transferMultiassets(
-      assets,
-      feeAssetItem,
-      dest,
-      'Unlimited',
-    ))
+
+    let fee = {
+      V3: {
+        id: {Concrete: multilocation.karura.token.kar},
+        fun: {Fungible: unit.kar(10)},
+      },
+    };
+    let dest = {V3: multilocation.quartz.account(bob.addressRaw)};
+    const karuraMessageHash = await sendAndWait(
+      bob,
+      karuraApi.tx.xTokens.transferMultiassetWithFee(
+        xnft,
+        fee,
+        dest,
+        'Unlimited',
+      ),
+    )
       .then(result => result.extractEvents.general.xcmpQueueMessageSent)
       .then(events => events[0].messageHash);
     console.log(`[XNFT] sent "Karura/Collection(#${karuraCollectionId})/NFT(#${karuraTokenId})" to Karura`);
@@ -261,25 +257,18 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
     ).then(isOwned => expect(isOwned.toJSON()).to.be.true);
     console.log('[XNFT] the owner of the derivative NFT is correct');
 
-    assets = {
-      V3: [
-        {
-          id: {Concrete: multilocation.karura.token.kar},
-          fun: {Fungible: unit.kar(1)},
-        },
-        {
-          id: {Concrete: multilocation.karura.nftCollection(karuraCollectionId)},
-          fun: {NonFungible: {Index: karuraTokenId}},
-        },
-      ],
+    fee = {
+      V3: {
+        id: {Concrete: multilocation.karura.token.kar},
+        fun: {Fungible: unit.kar(1)},
+      },
     };
-    feeAssetItem = 0;
     dest = {V3: multilocation.karura.account(alice.addressRaw)};
     const quartzMessageHash = await sendAndWait(
       bob,
-      quartzApi.tx.xTokens.transferMultiassets(
-        assets,
-        feeAssetItem,
+      quartzApi.tx.xTokens.transferMultiassetWithFee(
+        xnft,
+        fee,
         dest,
         'Unlimited',
       ),

@@ -4,6 +4,7 @@ This repository contains the tests related to XCM NFTs for various networks.
 
 It uses Unique Network's `baedeker` tool to set up the test networks.
 Also, [direnv](https://direnv.net/) is used to load all the needed environment variables automatically, such as:
+* `RELAY_POLKADOT_BRANCH` containing the version of the relaychain runtime used in tests
 * `<NETWORK_NAME>_URL` containing the running test network's URL 
 * `<NETWORK_NAME>_ID` containing the parachain ID of the test network (if it is not the relay chain)
 

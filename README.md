@@ -88,7 +88,7 @@ Examples:
 
 ## How to use `baedeker` in CI
 
-To you `baedeker` in CI you need to:
+To use `baedeker` in CI you need to:
 * Install it
     ```yaml
     - name: Install baedeker

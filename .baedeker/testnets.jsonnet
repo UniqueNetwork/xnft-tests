@@ -32,6 +32,10 @@ local quartz = {
 		[name]: {
 			bin: $.bin,
 			wantedKeys: 'para',
+
+			extraArgs: [
+				"-lxcm=trace"
+			],
 		},
 		for name in ['alice', 'bob']
 	},

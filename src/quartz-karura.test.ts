@@ -182,7 +182,7 @@ describe('cross-transfer NFTs between Quartz and Karura', () => {
     console.log(`[XNFT] created NFT collection #${karuraCollectionId} on Karura`);
     console.log(`\t... the collection account: ${karuraCollectionAccount}`);
 
-    await sendAndWait(alice, karuraApi.tx.balances.transfer({Id: karuraCollectionAccount}, unit.kar(10)));
+    await sendAndWait(alice, karuraApi.tx.balances.transferKeepAlive({Id: karuraCollectionAccount}, unit.kar(10)));
     console.log('\t... sponsored the collection account');
 
     const quartzCollectionId = await sendAndWait(

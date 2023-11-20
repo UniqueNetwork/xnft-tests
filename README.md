@@ -86,6 +86,36 @@ Examples:
 
 11. If need the test networks again with the same binaries, you can just run then: `./up.sh ./testnets.jsonnet`.
 
+### How to get the logs
+
+By default, all networks' nodes run with the `-lxcm=trace` argument.
+
+When you start the test networks, you will see that each node defined in the `testnets.json` has its own docker container.
+
+By typing `docker ps` you can see them.
+
+The example output:
+```
+CONTAINER ID   IMAGE                                           COMMAND                  CREATED         STATUS         PORTS     NAMES
+5e7fe845589b   nginx:latest                                    "/docker-entrypoint.…"   6 seconds ago   Up 3 seconds   80/tcp    bdk-env-nginx-1
+13a00167b251   0lach/empty:latest                              "/home/mrshiposha/de…"   6 seconds ago   Up 4 seconds             bdk-env-relay-karura-node-bob-1
+6cb79f49e42c   0lach/empty:latest                              "/home/mrshiposha/de…"   6 seconds ago   Up 4 seconds             bdk-env-relay-quartz-node-alice-1
+cc8294383ab0   uniquenetwork/builder-polkadot:release-v1.0.0   "/bin/polkadot --nam…"   6 seconds ago   Up 4 seconds             bdk-env-relay-node-alice-1
+4d79b6ba1bc1   0lach/empty:latest                              "/home/mrshiposha/de…"   6 seconds ago   Up 4 seconds             bdk-env-relay-quartz-node-bob-1
+a5210fcb9255   uniquenetwork/builder-polkadot:release-v1.0.0   "/bin/polkadot --nam…"   6 seconds ago   Up 5 seconds             bdk-env-relay-node-ferdie-1
+d8880f6749d0   uniquenetwork/builder-polkadot:release-v1.0.0   "/bin/polkadot --nam…"   6 seconds ago   Up 5 seconds             bdk-env-relay-node-bob-1
+ab4ed157b4a9   jacogr/polkadot-js-apps:latest                  "/docker-entrypoint.…"   6 seconds ago   Up 4 seconds   80/tcp    bdk-env-polkadot-apps-1
+3a1b750774ac   0lach/empty:latest                              "/home/mrshiposha/de…"   6 seconds ago   Up 5 seconds             bdk-env-relay-karura-node-alice-1
+dd662e356362   uniquenetwork/builder-polkadot:release-v1.0.0   "/bin/polkadot --nam…"   6 seconds ago   Up 5 seconds             bdk-env-relay-node-dave-1
+bfece072c400   uniquenetwork/builder-polkadot:release-v1.0.0   "/bin/polkadot --nam…"   6 seconds ago   Up 4 seconds             bdk-env-relay-node-charlie-1
+9c7087ac0252   uniquenetwork/builder-polkadot:release-v1.0.0   "/bin/polkadot --nam…"   6 seconds ago   Up 5 seconds             bdk-env-relay-node-eve-1
+```
+
+Suppose you're interested in logs of a Quartz node. There are several Quartz nodes in the list above, so you can choose any of them (see the `NAMES` column). For instance, you could pick the `bdk-env-relay-quartz-node-alice-1` by typing the following:
+```
+docker logs -f bdk-env-relay-quartz-node-alice-1
+```
+
 ## How to use `baedeker` in CI
 
 To use `baedeker` in CI you need to:

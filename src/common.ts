@@ -186,7 +186,7 @@ export const registerForeignAssetOnQuartz = async (
     console.log(`[XNFT] foreign asset "${metadata.tokenPrefix}" is already registered on Quartz`);
   } else {
     await sendAndWait(signer, api.tx.sudo.sudo(api.tx.foreignAssets.forceRegisterForeignAsset(
-      assetId,
+      {V3: assetId},
       strUtf16(metadata.name),
       metadata.tokenPrefix,
       metadata.mode,

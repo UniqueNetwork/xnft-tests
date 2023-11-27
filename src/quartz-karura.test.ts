@@ -529,7 +529,9 @@ const registerQuartzCollectionOnKarura = async (
   const karuraCollectionId = await sendAndWait(
     signer,
     api.tx.sudo.sudo(api.tx.xnft.registerAsset({
-      Concrete: multilocation.quartz.nftCollection(quartzCollectionId),
+      V3: {
+        Concrete: multilocation.quartz.nftCollection(quartzCollectionId),
+      },
     })),
   )
     .then(result => result.extractEvents.karura.xnftAssetRegistered)
@@ -592,7 +594,11 @@ const registerKaruraCollectionOnQuartz = async (
   const quartzCollectionId = await sendAndWait(
     signer,
     api.tx.sudo.sudo(api.tx.foreignAssets.forceRegisterForeignAsset(
-      {Concrete: multilocation.karura.nftCollection(karuraCollectionId)},
+      {
+        V3: {
+          Concrete: multilocation.karura.nftCollection(karuraCollectionId),
+        },
+      },
       strUtf16('Karura NFT'),
       'xNFT',
       'NFT',

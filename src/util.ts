@@ -19,7 +19,7 @@ export class TxResult {
       if(expected != null) {
         return new Promise((resolve) => resolve(expected.map(e => e.event)));
       } else {
-        throw Error(`the expected event "${section}.${method}" is not found`);
+        throw new Error(`the expected event "${section}.${method}" is not found`);
       }
     });
   }
@@ -263,6 +263,6 @@ export const palletSubAccount = async (api: ApiPromise, palletId: string, sub: n
     const zeroPadding = new Uint8Array(32 - palletIdEncoded.length - subEncoded.length).fill(0);
     return await toChainAddressFormat(api, new Uint8Array([...palletIdEncoded, ...subEncoded, ...zeroPadding]));
   } else {
-    throw Error('pallet ID length must be 8');
+    throw new Error('pallet ID length must be 8');
   }
 };

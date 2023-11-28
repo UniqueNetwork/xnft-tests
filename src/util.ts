@@ -128,7 +128,7 @@ export const sendAndWait = (signer: IKeyringPair, tx: any): Promise<TxResult> =>
         resolve(new TxResult(result));
       } else {
         const strErrors = errors.join('; ');
-        reject(strErrors);
+        reject(new Error(strErrors));
       }
     }
   });
@@ -171,7 +171,7 @@ export const waitForEvents = (
       waiting++;
     } else {
       unsub();
-      reject(`[ERROR] "${eventStr} didn't happen"`);
+      reject(new Error(`"${eventStr}" didn't happen`));
     }
   });
 }));
@@ -227,7 +227,7 @@ export const searchEvents = <T> (
       waiting++;
     } else {
       unsub();
-      reject(`[ERROR] no events matching the criteria: "${options.criteria}"`);
+      reject(new Error(`no events matching the criteria: "${options.criteria}"`));
     }
   });
 });

@@ -108,8 +108,10 @@ describe('Quartz/Karura XNFT tests', () => {
 
     await expectXcmpQueueSuccess(karuraApi, quartzMessageHash);
 
-    const karuraTokenId = await karuraApi.query.xnft.assetInstanceToItem(karuraCollectionId, {Index: quartzTokenId})
-      .then(data => data.toJSON() as number);
+    const karuraTokenId = await karuraApi.query.xnft.foreignInstanceToDerivativeStatus(karuraCollectionId, {Index: quartzTokenId})
+      .then(data => data.toJSON() as any)
+      .then(data => data.active);
+
     console.log(`[XNFT] minted NFT Karura/Collection(#${karuraCollectionId})/NFT(#${karuraTokenId})`);
     console.log(`\t... backed by Quartz/Collection(#${quartzCollectionId})/NFT(#${quartzTokenId})`);
 
@@ -403,8 +405,9 @@ describe('Quartz/Karura XNFT tests', () => {
 
     await expectXcmpQueueSuccess(karuraApi, quartzMessageHash);
 
-    const karuraTokenId = await karuraApi.query.xnft.assetInstanceToItem(karuraCollectionId, {Index: quartzTokenId})
-      .then(data => data.toJSON() as number);
+    const karuraTokenId = await karuraApi.query.xnft.foreignInstanceToDerivativeStatus(karuraCollectionId, {Index: quartzTokenId})
+      .then(data => data.toJSON() as any)
+      .then(data => data.active);
 
     await sendAndWait(
       bob,
@@ -460,8 +463,10 @@ describe('Quartz/Karura XNFT tests', () => {
 
     await expectXcmpQueueSuccess(karuraApi, quartzMessageHash);
 
-    const karuraTokenId = await karuraApi.query.xnft.assetInstanceToItem(karuraCollectionId, {Index: quartzTokenId})
-      .then(data => data.toJSON() as number);
+    const karuraTokenId = await karuraApi.query.xnft.foreignInstanceToDerivativeStatus(karuraCollectionId, {Index: quartzTokenId})
+      .then(data => data.toJSON() as any)
+      .then(data => data.active);
+
     dest = {V3: multilocation.quartz.account(alice.addressRaw)};
     xnft = {
       V3: {

@@ -85,10 +85,10 @@ class Events {
 
     return new class KaruraEvent {
       public get xnftAssetRegistered() {
-        return getEvents('xnft', 'AssetRegistered')
+        return getEvents('xnft', 'ForeignAssetRegistered')
           .then(events =>
             events.map(event => ({
-              assetId: event.data[0] as XcmAssetId,
+              foreignAssetId: event.data[0] as XcmAssetId,
               collectionId: event.data[1].toJSON() as number,
             })));
       }

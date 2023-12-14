@@ -108,7 +108,7 @@ describe('Quartz/Karura XNFT tests', () => {
 
     await expectXcmpQueueSuccess(karuraApi, quartzMessageHash);
 
-    const karuraTokenId = await karuraApi.query.xnft.foreignInstanceToDerivativeStatus(karuraCollectionId, {Index: quartzTokenId})
+    const karuraTokenId = await karuraApi.query.xnft.foreignInstanceToDerivativeIdStatus(karuraCollectionId, {Index: quartzTokenId})
       .then(data => data.toJSON() as any)
       .then(data => data.active);
 
@@ -405,7 +405,7 @@ describe('Quartz/Karura XNFT tests', () => {
 
     await expectXcmpQueueSuccess(karuraApi, quartzMessageHash);
 
-    const karuraTokenId = await karuraApi.query.xnft.foreignInstanceToDerivativeStatus(karuraCollectionId, {Index: quartzTokenId})
+    const karuraTokenId = await karuraApi.query.xnft.foreignInstanceToDerivativeIdStatus(karuraCollectionId, {Index: quartzTokenId})
       .then(data => data.toJSON() as any)
       .then(data => data.active);
 
@@ -463,7 +463,7 @@ describe('Quartz/Karura XNFT tests', () => {
 
     await expectXcmpQueueSuccess(karuraApi, quartzMessageHash);
 
-    const karuraTokenId = await karuraApi.query.xnft.foreignInstanceToDerivativeStatus(karuraCollectionId, {Index: quartzTokenId})
+    const karuraTokenId = await karuraApi.query.xnft.foreignInstanceToDerivativeIdStatus(karuraCollectionId, {Index: quartzTokenId})
       .then(data => data.toJSON() as any)
       .then(data => data.active);
 
@@ -531,13 +531,17 @@ const registerQuartzCollectionOnKarura = async (
   signer: IKeyringPair,
   quartzCollectionId: number,
 ) => {
+  const emptyAttributes = api.createType('BTreeMap<Bytes, Bytes>', {});
   const karuraCollectionId = await sendAndWait(
     signer,
-    api.tx.sudo.sudo(api.tx.xnft.registerAsset({
-      V3: {
-        Concrete: multilocation.quartz.nftCollection(quartzCollectionId),
+    api.tx.sudo.sudo(api.tx.xnft.registerForeignAsset(
+      {
+        V3: {
+          Concrete: multilocation.quartz.nftCollection(quartzCollectionId),
+        },
       },
-    })),
+      emptyAttributes,
+    )),
   )
     .then(result => result.extractEvents.karura.xnftAssetRegistered)
     .then(events => events[0].collectionId);

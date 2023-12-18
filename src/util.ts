@@ -4,6 +4,7 @@ import {EventRecord, Event, XcmAssetId, DispatchError} from '@polkadot/types/int
 import {IKeyringPair, ISubmittableResult} from '@polkadot/types/types';
 import {nToU8a, stringToU8a} from '@polkadot/util';
 import {encodeAddress} from '@polkadot/util-crypto';
+import {IChain} from './common';
 
 export class TxResult {
   private result: ISubmittableResult;
@@ -105,6 +106,19 @@ class Events {
   }
 }
 
+export const chainNativeCurrencyInfo = async (api: ApiPromise) => {
+  const properties = await api.rpc.system.properties();
+  const symbol = properties.tokenSymbol.unwrap()[0].toString();
+  const decimals = properties.tokenDecimals.unwrap()[0].toNumber();
+
+  return {
+    symbol,
+    decimals,
+  };
+};
+
+export const adjustToDecimals = (n: number, decimals: number) => BigInt(n) * 10n ** BigInt(decimals);
+
 // eslint-disable-next-line no-async-promise-executor
 export const sendAndWait = (signer: IKeyringPair, tx: any): Promise<TxResult> => new Promise(async (resolve, reject) => {
   const unsub = await tx.signAndSend(signer, (result: ISubmittableResult) => {
@@ -135,22 +149,21 @@ export const sendAndWait = (signer: IKeyringPair, tx: any): Promise<TxResult> =>
 });
 
 export const waitForEvents = (
-  api: ApiPromise,
+  chain: IChain,
   options: {maxBlocksToWait: number} = {maxBlocksToWait: 5},
 
   // eslint-disable-next-line no-async-promise-executor
 ) => new Events((section: string, method: string) => new Promise(async (resolve, reject) => {
-  const chain = await api.rpc.system.chain();
   const eventStr = `${section}.${method}`;
 
   const maxBlocksToWait = options.maxBlocksToWait;
 
-  console.log(`[XNFT] ${chain}: waiting for the event "${eventStr}"`);
+  console.log(`[XNFT] ${chain.name}: waiting for the event "${eventStr}"`);
 
   let waiting = 1;
   let lastBlockNumber = 0;
 
-  const unsub = await api.rpc.chain.subscribeNewHeads(async header => {
+  const unsub = await chain.api.rpc.chain.subscribeNewHeads(async header => {
     const blockNumber = header.number.toNumber();
     if(blockNumber > lastBlockNumber) {
       lastBlockNumber = blockNumber;
@@ -160,7 +173,7 @@ export const waitForEvents = (
 
     console.log(`\t... [attempt ${waiting}/${maxBlocksToWait}] block #${blockNumber}`);
 
-    const eventRecords = await api.query.system.events() as Vec<EventRecord>;
+    const eventRecords = await chain.api.query.system.events() as Vec<EventRecord>;
     const neededRecords = eventRecords.filter(eventRecord => eventRecord.event.section == section && eventRecord.event.method == method);
 
     if(neededRecords.length != 0) {
@@ -177,7 +190,7 @@ export const waitForEvents = (
 }));
 
 export const searchEvents = <T> (
-  api: ApiPromise,
+  chain: IChain,
   options: {
     criteria: string,
     filterMap: (event: Events) => Promise<T[]>,
@@ -185,8 +198,7 @@ export const searchEvents = <T> (
   },
   // eslint-disable-next-line no-async-promise-executor
 ) => new Promise<T[]>(async (resolve, reject) => {
-  const chain = await api.rpc.system.chain();
-  console.log(`[XNFT] ${chain}: searching an event meeting the following criteria:`);
+  console.log(`[XNFT] ${chain.name}: searching an event meeting the following criteria:`);
   console.log(`\t- ${options.criteria}`);
 
   const maxBlocksToWait = options.maxBlocksToWait ?? 5;
@@ -194,7 +206,7 @@ export const searchEvents = <T> (
   let waiting = 1;
   let lastBlockNumber = 0;
 
-  const unsub = await api.rpc.chain.subscribeNewHeads(async header => {
+  const unsub = await chain.api.rpc.chain.subscribeNewHeads(async header => {
     const blockNumber = header.number.toNumber();
     if(blockNumber > lastBlockNumber) {
       lastBlockNumber = blockNumber;
@@ -204,7 +216,7 @@ export const searchEvents = <T> (
 
     const msgPrefix = `\t... [attempt ${waiting}/${maxBlocksToWait}] block #${blockNumber}`;
 
-    const eventRecords = await api.query.system.events() as Vec<EventRecord>;
+    const eventRecords = await chain.api.query.system.events() as Vec<EventRecord>;
 
     const goodEvents = await options.filterMap(new Events((section: string, method: string) => new Promise(resolve => {
       const neededRecords = eventRecords.filter(eventRecord => eventRecord.event.section == section && eventRecord.event.method == method);
@@ -232,9 +244,9 @@ export const searchEvents = <T> (
   });
 });
 
-export const expectXcmpQueueSuccess = async (api: ApiPromise, expectedMessageHash: string) => {
+export const expectXcmpQueueSuccess = async (chain: IChain, expectedMessageHash: string) => {
   const events = await searchEvents(
-    api,
+    chain,
     {
       criteria: `xcmpQueue.Success with messageHash == ${expectedMessageHash}`,
       filterMap: async events => {
@@ -266,3 +278,5 @@ export const palletSubAccount = async (api: ApiPromise, palletId: string, sub: n
     throw new Error('pallet ID length must be 8');
   }
 };
+
+export const strUtf16 = (string: string) => Array.from(string).map(x => x.charCodeAt(0));

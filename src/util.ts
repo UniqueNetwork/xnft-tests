@@ -13,16 +13,16 @@ export class TxResult {
     this.result = result;
   }
 
-  public get extractEvents() {
-    return new Events((section: string, method: string) => {
-      const expected = this.result.events.filter((record) => record.event.section == section && record.event.method == method);
+  public extractEvents<S extends string, M extends string, EventId extends `${S}.${M}`>(eventId: EventId): Promise<Event[]> {
+    const [section, method] = eventId.split('.');
 
-      if(expected != null) {
-        return new Promise((resolve) => resolve(expected.map(e => e.event)));
-      } else {
-        throw new Error(`the expected event "${section}.${method}" is not found`);
-      }
-    });
+    const expected = this.result.events.filter((record) => record.event.section == section && record.event.method == method);
+
+    if(expected != null) {
+      return new Promise((resolve) => resolve(expected.map(e => e.event)));
+    } else {
+      throw new Error(`the expected event "${section}.${method}" is not found`);
+    }
   }
 }
 
@@ -243,6 +243,28 @@ export const searchEvents = <T> (
     }
   });
 });
+
+export const paraSiblingSovereignAccount = (api: ApiPromise, paraid: number) => {
+  // We are getting a *sibling* parachain sovereign account,
+  // so we need a sibling prefix: encoded(b"sibl") == 0x7369626c
+  const siblingPrefix = '0x7369626c';
+
+  const encodedParaId = api.createType('u32', paraid).toHex(true).substring(2);
+  const suffix = '000000000000000000000000000000000000000000000000';
+
+  return siblingPrefix + encodedParaId + suffix;
+};
+
+export const paraChildSovereignAccount = (api: ApiPromise, paraid: number) => {
+  // We are getting a *child* parachain sovereign account,
+  // so we need a child prefix: encoded(b"para") == 0x70617261
+  const childPrefix = '0x70617261';
+
+  const encodedParaId = api.createType('u32', paraid).toHex(true).substring(2);
+  const suffix = '000000000000000000000000000000000000000000000000';
+
+  return childPrefix + encodedParaId + suffix;
+};
 
 export const expectXcmpQueueSuccess = async (chain: IChain, expectedMessageHash: string) => {
   const events = await searchEvents(

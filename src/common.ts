@@ -3,7 +3,7 @@ import {Option} from '@polkadot/types';
 import {HrmpChannel} from '@polkadot/types/interfaces';
 import {IKeyringPair} from '@polkadot/types/types';
 import {hexToString} from '@polkadot/util';
-import {adjustToDecimals, chainNativeCurrencyInfo, expectXcmpQueueSuccess, palletSubAccount, sendAndWait, strUtf16, toChainAddressFormat, waitForEvents} from './util';
+import {adjustToDecimals, chainNativeCurrencyInfo, expectXcmpQueueSuccess, palletSubAccount, paraChildSovereignAccount, paraSiblingSovereignAccount, sendAndWait, strUtf16, toChainAddressFormat, waitForEvents} from './util';
 import {expect} from 'chai';
 import {decodeAddress} from '@polkadot/util-crypto';
 
@@ -108,6 +108,7 @@ export interface ICurrency {
 export interface IChainLocations {
   self: IMultilocation;
   account: (address: Uint8Array) => IMultilocation;
+  paraSovereignAccount: (paraId: number) => string;
 }
 
 export interface IChain {
@@ -124,6 +125,7 @@ export interface IXcmNft<CollectionId, TokenId> {
 }
 
 export interface IParachain<CollectionId, TokenId> extends IChain {
+  paraId: number;
   xcmNft: IXcmNft<CollectionId, TokenId>;
 }
 
@@ -164,6 +166,7 @@ export class Relay implements IChain {
             },
           },
         }),
+        paraSovereignAccount: (paraId: number) => paraChildSovereignAccount(relayApi, paraId),
       },
       nativeCurrency: {
         id: {Concrete: relayLocation},
@@ -207,6 +210,7 @@ export class Relay implements IChain {
 
 export class Quartz implements IParachain<number, number> {
   api: ApiPromise;
+  paraId: number;
   name: string;
   locations: IChainLocations;
   nativeCurrency: ICurrency;
@@ -215,6 +219,7 @@ export class Quartz implements IParachain<number, number> {
 
   private constructor(chain: IParachain<number, number>) {
     this.api = chain.api;
+    this.paraId = chain.paraId;
     this.name = chain.name;
     this.locations = chain.locations;
     this.nativeCurrency = chain.nativeCurrency;
@@ -229,10 +234,12 @@ export class Quartz implements IParachain<number, number> {
 
     const chain: IParachain<number, number> = {
       api: quartzApi,
+      paraId: RELAY_QUARTZ_ID,
       name: 'Quartz',
       locations: {
         self: quartzLocation,
         account: parachainAccountMultilocation(RELAY_QUARTZ_ID),
+        paraSovereignAccount: (paraId: number) => paraSiblingSovereignAccount(quartzApi, paraId),
       },
       xcmNft: {
         collectionAssetId: (collectionId: number) => ({
@@ -293,8 +300,8 @@ export class Quartz implements IParachain<number, number> {
         metadata.tokenPrefix,
         metadata.mode,
       )))
-        .then(data => data.extractEvents.quartz.collectionCreated)
-        .then(events => events[0].collectionId);
+        .then(data => data.extractEvents('common.CollectionCreated'))
+        .then(events => events[0].data[0].toJSON() as number);
 
       const kind = (metadata.mode == 'NFT' ? 'NFT' : 'fungible');
       console.log(`[XNFT] ${this.name}: the ${kind} foreign asset "${metadata.name}" is registered as "${this.name}/Collection(${collectionId})"`);
@@ -308,8 +315,8 @@ export class Quartz implements IParachain<number, number> {
       mode: 'NFT',
       tokenPrefix: 'xNFT',
     }))
-      .then(result => result.extractEvents.quartz.collectionCreated)
-      .then(events => events[0].collectionId);
+      .then(data => data.extractEvents('common.CollectionCreated'))
+      .then(events => events[0].data[0].toJSON() as number);
     console.log(`[XNFT] ${this.name}: created "${this.name}/Collection(${collectionId})"`);
 
     return collectionId;
@@ -321,8 +328,8 @@ export class Quartz implements IParachain<number, number> {
       {Substrate: owner},
       'NFT',
     ))
-      .then(result => result.extractEvents.quartz.itemCreated)
-      .then(events => events[0].tokenId);
+      .then(result => result.extractEvents('common.ItemCreated'))
+      .then(events => events[0].data[1].toJSON() as number);
 
     const token = new Token(this, collectionId, tokenId);
 
@@ -349,6 +356,7 @@ export class Quartz implements IParachain<number, number> {
 
 export class Karura implements IParachain<number, number> {
   api: ApiPromise;
+  paraId: number;
   name: string;
   locations: IChainLocations;
   nativeCurrency: ICurrency;
@@ -357,6 +365,7 @@ export class Karura implements IParachain<number, number> {
 
   private constructor(chain: IParachain<number, number>) {
     this.api = chain.api;
+    this.paraId = chain.paraId;
     this.name = chain.name;
     this.locations = chain.locations;
     this.nativeCurrency = chain.nativeCurrency;
@@ -390,10 +399,12 @@ export class Karura implements IParachain<number, number> {
 
     const chain: IParachain<number, number> = {
       api: karuraApi,
+      paraId: RELAY_KARURA_ID,
       name: 'Karura',
       locations: {
         self: karuraLocation,
         account: parachainAccountMultilocation(RELAY_KARURA_ID),
+        paraSovereignAccount: (paraId: number) => paraSiblingSovereignAccount(karuraApi, paraId),
       },
       xcmNft: {
         collectionAssetId: (collectionId: number) => ({
@@ -473,8 +484,8 @@ export class Karura implements IParachain<number, number> {
         V3: assetId,
       })),
     )
-      .then(result => result.extractEvents.karura.xnftAssetRegistered)
-      .then(events => events[0].collectionId);
+      .then(result => result.extractEvents('xnft.AssetRegistered'))
+      .then(events => events[0].data[1].toJSON() as number);
 
     console.log(`[XNFT] ${this.name}: the NFT foreign asset "${description}" is registered as "${this.name}/Collection(${collectionId})"`);
     return collectionId;
@@ -488,8 +499,9 @@ export class Karura implements IParachain<number, number> {
       enableAllCollectionFeatures,
       emptyAttributes,
     ))
-      .then(result => result.extractEvents.karura.nftCreatedClass)
-      .then(events => events[0].classId);
+      .then(result => result.extractEvents('nft.CreatedClass'))
+      .then(events => events[0].data[1].toJSON() as number);
+
     const karuraCollectionAccount = await palletSubAccount(this.api, 'aca/aNFT', karuraCollectionId);
 
     console.log(`[XNFT] ${this.name}: created "${this.name}/Collection(${karuraCollectionId})"`);
@@ -612,8 +624,9 @@ export class XTokens<CollectionId, TokenId> {
         'Unlimited',
       ),
     )
-      .then(result => result.extractEvents.general.xcmpQueueMessageSent)
-      .then(events => events[0].messageHash);
+      .then(result => result.extractEvents('xcmpQueue.XcmpMessageSent'))
+      .then(events => events[0].data[0].toString());
+
     console.log(`[XNFT] ${args.token.stringify()} is sent: ${this.chain.name} -> ${args.destChain.name}/Account(${args.beneficiary})`);
     console.log(`\t... message hash: ${messageHash}`);
 

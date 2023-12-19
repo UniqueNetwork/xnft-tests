@@ -1,6 +1,6 @@
 import {ApiPromise} from '@polkadot/api';
 import {Vec} from '@polkadot/types';
-import {EventRecord, Event, XcmAssetId, DispatchError} from '@polkadot/types/interfaces';
+import {EventRecord, Event, DispatchError} from '@polkadot/types/interfaces';
 import {IKeyringPair, ISubmittableResult} from '@polkadot/types/types';
 import {nToU8a, stringToU8a} from '@polkadot/util';
 import {encodeAddress} from '@polkadot/util-crypto';
@@ -13,96 +13,16 @@ export class TxResult {
     this.result = result;
   }
 
-  public extractEvents<S extends string, M extends string, EventId extends `${S}.${M}`>(eventId: EventId): Promise<Event[]> {
-    const [section, method] = eventId.split('.');
+  public extractEvents<S extends string, M extends string, EventId extends `${S}.${M}`>(event: EventId): Event[] {
+    const [section, method] = event.split('.');
 
     const expected = this.result.events.filter((record) => record.event.section == section && record.event.method == method);
 
     if(expected != null) {
-      return new Promise((resolve) => resolve(expected.map(e => e.event)));
+      return expected.map(e => e.event);
     } else {
       throw new Error(`the expected event "${section}.${method}" is not found`);
     }
-  }
-}
-
-class Events {
-  getEvents: (section: string, method: string) => Promise<Event[]>;
-
-  constructor(getEvents: (section: string, method: string) => Promise<Event[]>) {
-    this.getEvents = getEvents;
-  }
-
-  public get general() {
-    const getEvents = this.getEvents;
-
-    return new class GeneralEvent {
-      public get newSession() {
-        return getEvents('session', 'NewSession');
-      }
-
-      public get xcmpQueueSuccess() {
-        return getEvents('xcmpQueue', 'Success')
-          .then(events =>
-            events.map(event => ({
-              messageHash: event.data[0].toString(),
-            })));
-      }
-
-      public get xcmpQueueMessageSent() {
-        return getEvents('xcmpQueue', 'XcmpMessageSent')
-          .then(events =>
-            events.map(event => ({
-              messageHash: event.data[0].toString(),
-            })));
-      }
-    };
-  }
-
-  public get quartz() {
-    const getEvents = this.getEvents;
-
-    return new class QuartzEvent {
-      public get collectionCreated() {
-        return getEvents('common', 'CollectionCreated')
-          .then(events =>
-            events.map(event => ({
-              collectionId: event.data[0].toJSON() as number,
-            })));
-      }
-      public get itemCreated() {
-        return getEvents('common', 'ItemCreated')
-          .then(events =>
-            events.map(event => ({
-              collectionId: event.data[0].toJSON() as number,
-              tokenId: event.data[1].toJSON() as number,
-            })));
-      }
-    };
-  }
-
-  public get karura() {
-    const getEvents = this.getEvents;
-
-    return new class KaruraEvent {
-      public get xnftAssetRegistered() {
-        return getEvents('xnft', 'AssetRegistered')
-          .then(events =>
-            events.map(event => ({
-              assetId: event.data[0] as XcmAssetId,
-              collectionId: event.data[1].toJSON() as number,
-            })));
-      }
-
-      public get nftCreatedClass() {
-        return getEvents('nft', 'CreatedClass')
-          .then(events =>
-            events.map(event => ({
-              owner: event.data[0].toString(),
-              classId: event.data[1].toJSON() as number,
-            })));
-      }
-    };
   }
 }
 
@@ -148,52 +68,56 @@ export const sendAndWait = (signer: IKeyringPair, tx: any): Promise<TxResult> =>
   });
 });
 
-export const waitForEvents = (
+export function waitForEvents<S extends string, M extends string, EventId extends `${S}.${M}`>(
   chain: IChain,
-  options: {maxBlocksToWait: number} = {maxBlocksToWait: 5},
-
+  args: {
+    event: EventId,
+    maxBlocksToWait?: number
+  },
+): Promise<Event[]> {
   // eslint-disable-next-line no-async-promise-executor
-) => new Events((section: string, method: string) => new Promise(async (resolve, reject) => {
-  const eventStr = `${section}.${method}`;
+  return new Promise(async (resolve, reject) => {
+    const [section, method] = args.event.split('.');
 
-  const maxBlocksToWait = options.maxBlocksToWait;
+    const maxBlocksToWait = args.maxBlocksToWait ?? 5;
 
-  console.log(`[XNFT] ${chain.name}: waiting for the event "${eventStr}"`);
+    console.log(`[XNFT] ${chain.name}: waiting for the event "${args.event}"`);
 
-  let waiting = 1;
-  let lastBlockNumber = 0;
+    let waiting = 1;
+    let lastBlockNumber = 0;
 
-  const unsub = await chain.api.rpc.chain.subscribeNewHeads(async header => {
-    const blockNumber = header.number.toNumber();
-    if(blockNumber > lastBlockNumber) {
-      lastBlockNumber = blockNumber;
-    } else {
-      return;
-    }
+    const unsub = await chain.api.rpc.chain.subscribeNewHeads(async header => {
+      const blockNumber = header.number.toNumber();
+      if(blockNumber > lastBlockNumber) {
+        lastBlockNumber = blockNumber;
+      } else {
+        return;
+      }
 
-    console.log(`\t... [attempt ${waiting}/${maxBlocksToWait}] block #${blockNumber}`);
+      console.log(`\t... [attempt ${waiting}/${maxBlocksToWait}] block #${blockNumber}`);
 
-    const eventRecords = await chain.api.query.system.events() as Vec<EventRecord>;
-    const neededRecords = eventRecords.filter(eventRecord => eventRecord.event.section == section && eventRecord.event.method == method);
+      const eventRecords = await chain.api.query.system.events() as Vec<EventRecord>;
+      const neededRecords = eventRecords.filter(eventRecord => eventRecord.event.section == section && eventRecord.event.method == method);
 
-    if(neededRecords.length != 0) {
-      console.log(`\t... [OK] found ${neededRecords.length} "${eventStr}" event(s)`);
-      unsub();
-      resolve(neededRecords.map(record => record.event));
-    } else if(waiting < maxBlocksToWait) {
-      waiting++;
-    } else {
-      unsub();
-      reject(new Error(`"${eventStr}" didn't happen`));
-    }
+      if(neededRecords.length != 0) {
+        console.log(`\t... [OK] found ${neededRecords.length} "${args.event}" event(s)`);
+        unsub();
+        resolve(neededRecords.map(record => record.event));
+      } else if(waiting < maxBlocksToWait) {
+        waiting++;
+      } else {
+        unsub();
+        reject(new Error(`"${args.event}" didn't happen`));
+      }
+    });
   });
-}));
+}
 
 export const searchEvents = <T> (
   chain: IChain,
   options: {
     criteria: string,
-    filterMap: (event: Events) => Promise<T[]>,
+    filterMap: (event: Event[]) => T[],
     maxBlocksToWait?: number,
   },
   // eslint-disable-next-line no-async-promise-executor
@@ -218,24 +142,18 @@ export const searchEvents = <T> (
 
     const eventRecords = await chain.api.query.system.events() as Vec<EventRecord>;
 
-    const goodEvents = await options.filterMap(new Events((section: string, method: string) => new Promise(resolve => {
-      const neededRecords = eventRecords.filter(eventRecord => eventRecord.event.section == section && eventRecord.event.method == method);
-      const eventStr = `${section}.${method}`;
+    if(eventRecords.length != 0) {
+      console.log(`${msgPrefix}: processing ${eventRecords.length} event(s)`);
+    }
 
-      if(neededRecords.length != 0) {
-        console.log(`${msgPrefix}: processing ${neededRecords.length} "${eventStr}" event(s)`);
-      } else {
-        console.log(`${msgPrefix}: no suitable events found in this block`);
-      }
+    const neededRecords = options.filterMap(eventRecords.map(r => r.event));
 
-      resolve(neededRecords.map(record => record.event));
-    })));
-
-    if(goodEvents.length != 0) {
-      console.log(`\t... [OK] found ${goodEvents.length} suitable event(s)`);
+    if(neededRecords.length != 0) {
+      console.log(`\t... [OK] found ${neededRecords.length} suitable event(s)`);
       unsub();
-      resolve(goodEvents);
+      resolve(neededRecords);
     } else if(waiting < maxBlocksToWait) {
+      console.log(`${msgPrefix}: no suitable events found in this block`);
       waiting++;
     } else {
       unsub();
@@ -267,22 +185,17 @@ export const paraChildSovereignAccount = (api: ApiPromise, paraid: number) => {
 };
 
 export const expectXcmpQueueSuccess = async (chain: IChain, expectedMessageHash: string) => {
-  const events = await searchEvents(
+  await searchEvents(
     chain,
     {
       criteria: `xcmpQueue.Success with messageHash == ${expectedMessageHash}`,
-      filterMap: async events => {
-        const messages = await events.general.xcmpQueueSuccess
-          .then(events =>
-            events.map(event =>
-              event.messageHash));
-
-        return messages.filter(hash => hash == expectedMessageHash);
-      },
+      filterMap: events => events
+        .filter(e =>
+          e.section == 'xcmpQueue'
+          && e.method == 'Success'
+          && e.data[0].toString() == expectedMessageHash),
     },
   );
-
-  return events[0];
 };
 
 export const toChainAddressFormat = async (api: ApiPromise, address: string | Uint8Array) => {

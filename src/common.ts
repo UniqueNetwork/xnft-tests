@@ -188,7 +188,7 @@ export class Relay implements IChain {
 
     if(sessionId == 0) {
       console.log(`[XNFT] ${this.name}: parachains will start at the next relaychain session`);
-      await waitForEvents(this, {maxBlocksToWait: 12}).general.newSession;
+      await waitForEvents(this, {event: 'session.NewSession', maxBlocksToWait: 12});
     }
   }
 

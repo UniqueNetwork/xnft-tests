@@ -2,21 +2,34 @@ import {ApiPromise, WsProvider} from '@polkadot/api';
 import {Option} from '@polkadot/types';
 import {HrmpChannel} from '@polkadot/types/interfaces';
 import {IKeyringPair} from '@polkadot/types/types';
-import {hexToString} from '@polkadot/util';
-import {adjustToDecimals, chainNativeCurrencyInfo, expectXcmpQueueSuccess, palletSubAccount, paraChildSovereignAccount, paraSiblingSovereignAccount, sendAndWait, strUtf16, toChainAddressFormat, waitForEvents} from './util';
+import {
+  adjustToDecimals,
+  chainNativeCurrencyInfo,
+  expectXcmpQueueSuccess,
+  paraChildSovereignAccount,
+  paraSiblingSovereignAccount,
+  sendAndWait,
+  waitForEvents,
+} from './util';
 import {expect} from 'chai';
 import {decodeAddress} from '@polkadot/util-crypto';
 
-export const RELAY_URL = process.env.RELAY_URL;
-export const RELAY_QUARTZ_URL = process.env.RELAY_QUARTZ_URL;
-export const RELAY_KARURA_URL = process.env.RELAY_KARURA_URL;
-
-export const RELAY_QUARTZ_ID = +(process.env.RELAY_QUARTZ_ID || 2095);
-export const RELAY_KARURA_ID = +(process.env.RELAY_KARURA_ID || 2000);
+export const RELAY_URL = process.env.RELAY_URL!;
 
 export interface IMultilocation {
   parents: number;
   interior: IInterior;
+}
+
+export type IAssetId = {
+  Concrete: IMultilocation,
+} | {
+  Abstract: string
+};
+
+export interface IMultiAsset {
+  id: IAssetId;
+  fun: IFungibility;
 }
 
 export type IFungibility = {
@@ -36,17 +49,6 @@ export type IAssetInstance = 'Undefined' | {
 } | {
   Array32: string,
 };
-
-export type IAssetId = {
-  Concrete: IMultilocation,
-} | {
-  Abstract: string
-};
-
-export interface IMultiAsset {
-  id: IAssetId;
-  fun: IFungibility;
-}
 
 export type IInterior = 'Here' | {
   X1: IJunction
@@ -119,7 +121,7 @@ export interface IChain {
 }
 
 export interface IXcmNft<CollectionId, TokenId> {
-  collectionAssetId: (collectionId: CollectionId) => IAssetId;
+  assetId: (collectionId: CollectionId) => IAssetId;
   assetInstance: (tokenId: TokenId) => IAssetInstance;
   checkTokenOwner: (collectionId: CollectionId, tokenId: TokenId, expectedOwner: string) => Promise<boolean>;
 }
@@ -127,6 +129,64 @@ export interface IXcmNft<CollectionId, TokenId> {
 export interface IParachain<CollectionId, TokenId> extends IChain {
   paraId: number;
   xcmNft: IXcmNft<CollectionId, TokenId>;
+}
+
+export class Parachain<CollectionId, TokenId> implements IParachain<CollectionId, TokenId> {
+  api: ApiPromise;
+  paraId: number;
+  name: string;
+  locations: IChainLocations;
+  nativeCurrency: ICurrency;
+  xcmNft: IXcmNft<CollectionId, TokenId>;
+
+  protected constructor(chain: IParachain<CollectionId, TokenId>) {
+    this.api = chain.api;
+    this.paraId = chain.paraId;
+    this.name = chain.name;
+    this.locations = chain.locations;
+    this.nativeCurrency = chain.nativeCurrency;
+    this.xcmNft = chain.xcmNft;
+  }
+
+  protected static async connectParachain<CollectionId, TokenId>(args: {
+    api: ApiPromise,
+    paraId: number,
+    name: string,
+    nativeCurrencyId: IAssetId | 'SelfLocation',
+    xcmNft: IXcmNft<CollectionId, TokenId>,
+  }) {
+    const api = args.api;
+    const nativeCurrencyInfo = await chainNativeCurrencyInfo(api);
+    const nativeCurrencyAmount = (value: number) => adjustToDecimals(value, nativeCurrencyInfo.decimals);
+    const parachainLocation = parachainMultilocation(args.paraId);
+
+    const nativeCurrencyId = args.nativeCurrencyId == 'SelfLocation'
+      ? {Concrete: parachainLocation}
+      : args.nativeCurrencyId;
+
+    const chain: IParachain<CollectionId, TokenId> = {
+      api,
+      paraId: args.paraId,
+      name: args.name,
+      locations: {
+        self: parachainLocation,
+        account: parachainAccountMultilocation(args.paraId),
+        paraSovereignAccount: (paraId: number) => paraSiblingSovereignAccount(api, paraId),
+      },
+      nativeCurrency: {
+        id: nativeCurrencyId,
+        amount: nativeCurrencyAmount,
+        asMultiasset: (value: number) => ({
+          id: nativeCurrencyId,
+          fun: {Fungible: nativeCurrencyAmount(value)},
+        }),
+        ...nativeCurrencyInfo,
+      },
+      xcmNft: args.xcmNft,
+    };
+
+    return chain;
+  }
 }
 
 export class Relay implements IChain {
@@ -142,7 +202,7 @@ export class Relay implements IChain {
     this.nativeCurrency = chain.nativeCurrency;
   }
 
-  public static async connect() {
+  static async connect() {
     const relayApi = await ApiPromise.create({provider: new WsProvider(RELAY_URL)});
     const decimals = 12;
     const symbol = 'ROC';
@@ -183,6 +243,10 @@ export class Relay implements IChain {
     return new Relay(chain);
   }
 
+  async disconnect() {
+    await this.api.disconnect();
+  }
+
   async waitForParachainsStart() {
     const sessionId = (await this.api.query.session.currentIndex()).toJSON() as number;
 
@@ -208,352 +272,6 @@ export class Relay implements IChain {
   }
 }
 
-export class Quartz implements IParachain<number, number> {
-  api: ApiPromise;
-  paraId: number;
-  name: string;
-  locations: IChainLocations;
-  nativeCurrency: ICurrency;
-  xcmNft: IXcmNft<number, number>;
-  xtokens: XTokens<number, number>;
-
-  private constructor(chain: IParachain<number, number>) {
-    this.api = chain.api;
-    this.paraId = chain.paraId;
-    this.name = chain.name;
-    this.locations = chain.locations;
-    this.nativeCurrency = chain.nativeCurrency;
-    this.xcmNft = chain.xcmNft;
-    this.xtokens = new XTokens(this);
-  }
-
-  public static async connect() {
-    const quartzApi = await ApiPromise.create({provider: new WsProvider(RELAY_QUARTZ_URL)});
-    const nativeCurrencyInfo = await chainNativeCurrencyInfo(quartzApi);
-    const quartzLocation = parachainMultilocation(RELAY_QUARTZ_ID);
-
-    const chain: IParachain<number, number> = {
-      api: quartzApi,
-      paraId: RELAY_QUARTZ_ID,
-      name: 'Quartz',
-      locations: {
-        self: quartzLocation,
-        account: parachainAccountMultilocation(RELAY_QUARTZ_ID),
-        paraSovereignAccount: (paraId: number) => paraSiblingSovereignAccount(quartzApi, paraId),
-      },
-      xcmNft: {
-        collectionAssetId: (collectionId: number) => ({
-          Concrete: {
-            parents: 1,
-            interior: {
-              X2: [
-                {
-                  Parachain: RELAY_QUARTZ_ID,
-                },
-                {
-                  GeneralIndex: collectionId,
-                },
-              ],
-            },
-          },
-        }),
-        assetInstance: (tokenId: number) => ({
-          Index: tokenId,
-        }),
-        checkTokenOwner: async (collectionId: number, tokenId: number, expectedOwner: string) => await quartzApi.query.nonfungible.owned(
-          collectionId,
-          {Substrate: expectedOwner},
-          tokenId,
-        ).then(isOwned => isOwned.toJSON() as boolean),
-      },
-      nativeCurrency: {
-        id: {Concrete: quartzLocation},
-        amount: (value: number) => adjustToDecimals(value, nativeCurrencyInfo.decimals),
-        asMultiasset: (value: number) => ({
-          id: {Concrete: quartzLocation},
-          fun: {Fungible: adjustToDecimals(value, nativeCurrencyInfo.decimals)},
-        }),
-        ...nativeCurrencyInfo,
-      },
-    };
-
-    return new Quartz(chain);
-  }
-
-  async registerForeignAsset(
-    signer: IKeyringPair,
-    assetId: IAssetId,
-    metadata: {
-      name: string,
-      tokenPrefix: string,
-      mode: 'NFT' | { Fungible: number },
-    },
-  ) {
-    const collectionId = (await this.api.query.foreignAssets.foreignAssetToCollection(assetId)).toJSON();
-
-    if(collectionId) {
-      console.log(`[XNFT] ${this.name}: the foreign asset "${metadata.tokenPrefix}" is already registered`);
-    } else {
-      const collectionId = await sendAndWait(signer, this.api.tx.sudo.sudo(this.api.tx.foreignAssets.forceRegisterForeignAsset(
-        {V3: assetId},
-        strUtf16(metadata.name),
-        metadata.tokenPrefix,
-        metadata.mode,
-      )))
-        .then(data => data.extractEvents('common.CollectionCreated'))
-        .then(events => events[0].data[0].toJSON() as number);
-
-      const kind = (metadata.mode == 'NFT' ? 'NFT' : 'fungible');
-      console.log(`[XNFT] ${this.name}: the ${kind} foreign asset "${metadata.name}" is registered as "${this.name}/Collection(${collectionId})"`);
-
-      return collectionId;
-    }
-  }
-
-  async createCollection(signer: IKeyringPair) {
-    const collectionId = await sendAndWait(signer, this.api.tx.unique.createCollectionEx({
-      mode: 'NFT',
-      tokenPrefix: 'xNFT',
-    }))
-      .then(data => data.extractEvents('common.CollectionCreated'))
-      .then(events => events[0].data[0].toJSON() as number);
-    console.log(`[XNFT] ${this.name}: created "${this.name}/Collection(${collectionId})"`);
-
-    return collectionId;
-  }
-
-  async mintToken(signer: IKeyringPair, collectionId: number, owner: string) {
-    const tokenId = await sendAndWait(signer, this.api.tx.unique.createItem(
-      collectionId,
-      {Substrate: owner},
-      'NFT',
-    ))
-      .then(result => result.extractEvents('common.ItemCreated'))
-      .then(events => events[0].data[1].toJSON() as number);
-
-    const token = new Token(this, collectionId, tokenId);
-
-    console.log(`[XNFT] ${this.name}: minted ${token.stringify()}`);
-    return token;
-  }
-
-  async derivativeToken<CollectionId, TokenId>(token: Token<CollectionId, TokenId>) {
-    const derivativeCollectionId = await this.api.query.foreignAssets.foreignAssetToCollection(token.collectionAssetId())
-      .then(data => data.toJSON() as number | null);
-
-    const derivativeTokenId = await this.api.query.foreignAssets.foreignReserveAssetInstanceToTokenId(
-      derivativeCollectionId,
-      token.assetInstance(),
-    ).then(data => data.toJSON() as number | null);
-
-    if(derivativeCollectionId != null && derivativeTokenId != null) {
-      return new Token(this, derivativeCollectionId, derivativeTokenId);
-    } else {
-      throw Error(`[XNFT] no derivative was found for ${token.stringify()} on ${this.name}`);
-    }
-  }
-}
-
-export class Karura implements IParachain<number, number> {
-  api: ApiPromise;
-  paraId: number;
-  name: string;
-  locations: IChainLocations;
-  nativeCurrency: ICurrency;
-  xcmNft: IXcmNft<number, number>;
-  xtokens: XTokens<number, number>;
-
-  private constructor(chain: IParachain<number, number>) {
-    this.api = chain.api;
-    this.paraId = chain.paraId;
-    this.name = chain.name;
-    this.locations = chain.locations;
-    this.nativeCurrency = chain.nativeCurrency;
-    this.xcmNft = chain.xcmNft;
-    this.xtokens = new XTokens(this);
-  }
-
-  public static async connect() {
-    const karuraApi = await ApiPromise.create({provider: new WsProvider(RELAY_KARURA_URL)});
-    const nativeCurrencyInfo = await chainNativeCurrencyInfo(karuraApi);
-    const karuraLocation = parachainMultilocation(RELAY_KARURA_ID);
-
-    const nativeCurrencyId = {
-      Concrete: {
-        parents: 1,
-        interior: {
-          X2: [
-            {
-              Parachain: RELAY_KARURA_ID,
-            },
-            {
-              GeneralKey: {
-                length: 2,
-                data: '0x0080000000000000000000000000000000000000000000000000000000000000',
-              },
-            },
-          ],
-        },
-      },
-    };
-
-    const chain: IParachain<number, number> = {
-      api: karuraApi,
-      paraId: RELAY_KARURA_ID,
-      name: 'Karura',
-      locations: {
-        self: karuraLocation,
-        account: parachainAccountMultilocation(RELAY_KARURA_ID),
-        paraSovereignAccount: (paraId: number) => paraSiblingSovereignAccount(karuraApi, paraId),
-      },
-      xcmNft: {
-        collectionAssetId: (collectionId: number) => ({
-          Concrete: {
-            parents: 1,
-            interior: {
-              X3: [
-                {
-                  Parachain: RELAY_KARURA_ID,
-                },
-                {
-                  PalletInstance: 121,
-                },
-                {
-                  GeneralIndex: collectionId,
-                },
-              ],
-            },
-          },
-        }),
-        assetInstance: (tokenId: number) => ({
-          Index: tokenId,
-        }),
-        checkTokenOwner: async (collectionId: number, tokenId: number, expectedOwner: string) => {
-          const derivativeNftData: any = await karuraApi.query.ormlNFT.tokens(collectionId, tokenId)
-            .then(data => data.toJSON());
-
-          return derivativeNftData.owner == await toChainAddressFormat(karuraApi, expectedOwner);
-        },
-      },
-      nativeCurrency: {
-        id: nativeCurrencyId,
-        amount: (value: number) => adjustToDecimals(value, nativeCurrencyInfo.decimals),
-        asMultiasset: (value: number) => ({
-          id: nativeCurrencyId,
-          fun: {Fungible: adjustToDecimals(value, nativeCurrencyInfo.decimals)},
-        }),
-        ...nativeCurrencyInfo,
-      },
-    };
-
-    return new Karura(chain);
-  }
-
-  async registerFungibleForeignAsset(
-    signer: IKeyringPair,
-    reserveLocation: IMultilocation,
-    metadata: {
-      name: string,
-      symbol: string,
-      decimals: number,
-      minimalBalance: bigint,
-    },
-  ) {
-    const assets = (await (this.api.query.assetRegistry.assetMetadatas.entries())).map(([_k, v]: [any, any]) =>
-      hexToString(v.toJSON()['symbol'])) as string[];
-
-    if(assets.includes(metadata.symbol)) {
-      console.log(`[XNFT] ${this.name}: the foreign asset "${metadata.symbol}" is already registered`);
-    } else {
-      await sendAndWait(signer, this.api.tx.sudo.sudo(this.api.tx.assetRegistry.registerForeignAsset(
-        {V3: reserveLocation},
-        metadata,
-      )));
-      console.log(`[XNFT] ${this.name}: registered the foreign currency "${metadata.symbol}"`);
-    }
-  }
-
-  async registerNonFungibleForeignAsset(
-    signer: IKeyringPair,
-    assetId: IAssetId,
-    description: string,
-  ) {
-    const collectionId = await sendAndWait(
-      signer,
-      this.api.tx.sudo.sudo(this.api.tx.xnft.registerAsset({
-        V3: assetId,
-      })),
-    )
-      .then(result => result.extractEvents('xnft.AssetRegistered'))
-      .then(events => events[0].data[1].toJSON() as number);
-
-    console.log(`[XNFT] ${this.name}: the NFT foreign asset "${description}" is registered as "${this.name}/Collection(${collectionId})"`);
-    return collectionId;
-  }
-
-  async createCollection(signer: IKeyringPair) {
-    const enableAllCollectionFeatures = 0xF;
-    const emptyAttributes = this.api.createType('BTreeMap<Bytes, Bytes>', {});
-    const karuraCollectionId = await sendAndWait(signer, this.api.tx.nft.createClass(
-      'xNFT Collection',
-      enableAllCollectionFeatures,
-      emptyAttributes,
-    ))
-      .then(result => result.extractEvents('nft.CreatedClass'))
-      .then(events => events[0].data[1].toJSON() as number);
-
-    const karuraCollectionAccount = await palletSubAccount(this.api, 'aca/aNFT', karuraCollectionId);
-
-    console.log(`[XNFT] ${this.name}: created "${this.name}/Collection(${karuraCollectionId})"`);
-    console.log(`\t... the collection account: ${karuraCollectionAccount}`);
-
-    await sendAndWait(signer, this.api.tx.balances.transferKeepAlive({Id: karuraCollectionAccount}, this.nativeCurrency.amount(10)));
-    console.log('\t... sponsored the collection account');
-
-    return karuraCollectionId;
-  }
-
-  async mintToken(signer: IKeyringPair, collectionId: number, owner: string) {
-    const tokenId = (await this.api.query.ormlNFT.nextTokenId(collectionId)).toJSON() as number;
-    const collectionAccount = await palletSubAccount(this.api, 'aca/aNFT', collectionId);
-    const emptyAttributes = this.api.createType('BTreeMap<Bytes, Bytes>', {});
-
-    await sendAndWait(signer, this.api.tx.proxy.proxy(
-      {Id: collectionAccount},
-      'Any',
-      this.api.tx.nft.mint(
-        {Id: owner},
-        collectionId,
-        'xNFT',
-        emptyAttributes,
-        1,
-      ),
-    ));
-
-    const token = new Token(this, collectionId, tokenId);
-
-    console.log(`[XNFT] ${this.name}: minted ${token.stringify()}`);
-    return token;
-  }
-
-  async derivativeToken<CollectionId, TokenId>(token: Token<CollectionId, TokenId>) {
-    const derivativeCollectionId = await this.api.query.xnft.foreignAssetToClass(token.collectionAssetId())
-      .then(data => data.toJSON() as number | null);
-
-    const derivativeTokenId = await this.api.query.xnft.assetInstanceToItem(
-      derivativeCollectionId,
-      token.assetInstance(),
-    )
-      .then(data => data.toJSON() as number | null);
-
-    if(derivativeCollectionId != null && derivativeTokenId != null) {
-      return new Token(this, derivativeCollectionId, derivativeTokenId);
-    } else {
-      throw Error(`[XNFT] no derivative was found for ${token.stringify()} on ${this.name}`);
-    }
-  }
-}
-
 export class Token<CollectionId, TokenId> {
   chain: IParachain<CollectionId, TokenId>;
   collectionId: CollectionId;
@@ -569,8 +287,8 @@ export class Token<CollectionId, TokenId> {
     return `"${this.chain.name}/Collection(${this.collectionId})/Token(${this.tokenId})"`;
   }
 
-  collectionAssetId() {
-    return this.chain.xcmNft.collectionAssetId(this.collectionId);
+  assetId() {
+    return this.chain.xcmNft.assetId(this.collectionId);
   }
 
   assetInstance() {
@@ -579,13 +297,17 @@ export class Token<CollectionId, TokenId> {
 
   asMultiasset(): IMultiAsset {
     return {
-      id: this.collectionAssetId(),
+      id: this.assetId(),
       fun: {NonFungible: this.assetInstance()},
     };
   }
 
   async checkOwner(expectedOwner: string) {
-    const isCorrectOwner = await this.chain.xcmNft.checkTokenOwner(this.collectionId, this.tokenId, expectedOwner);
+    const isCorrectOwner = await this.chain.xcmNft.checkTokenOwner(
+      this.collectionId,
+      this.tokenId,
+      expectedOwner,
+    );
     expect(isCorrectOwner, `${this.stringify()} should be owned by ${expectedOwner}`).to.be.true;
 
     console.log(`[XNFT] ${this.chain.name}: the owner of ${this.stringify()} is correct (${expectedOwner})`);
@@ -659,33 +381,3 @@ const parachainAccountMultilocation = (paraId: number) => (address: Uint8Array) 
     ],
   },
 } as IMultilocation);
-
-export class AllChains {
-  relay: Relay;
-  quartz: Quartz;
-  karura: Karura;
-
-  private constructor(
-    relay: Relay,
-    quartz: Quartz,
-    karura: Karura,
-  ) {
-    this.relay = relay;
-    this.quartz = quartz;
-    this.karura = karura;
-  }
-
-  static async connect() {
-    return new AllChains(
-      await Relay.connect(),
-      await Quartz.connect(),
-      await Karura.connect(),
-    );
-  }
-
-  async disconnect() {
-    await this.relay.api.disconnect();
-    await this.quartz.api.disconnect();
-    await this.karura.api.disconnect();
-  }
-}

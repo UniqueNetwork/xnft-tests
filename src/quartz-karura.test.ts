@@ -2,15 +2,21 @@ import {Keyring} from '@polkadot/api';
 import {describe} from 'mocha';
 import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
-import {AllChains} from './common';
 import {IKeyringPair} from '@polkadot/types/types';
 import {sendAndWait} from './util';
+import {Relay} from './common';
+import {Quartz} from './unique-chains/quartz';
+import {Karura} from './acala-chains/karura';
 
 chai.use(chaiAsPromised);
 const expect = chai.expect;
 
 describe('Quartz/Karura XNFT tests', () => {
-  let chains: AllChains;
+  let chains: {
+    relay: Relay,
+    quartz: Quartz,
+    karura: Karura,
+  };
 
   let alice: IKeyringPair;
   let bob: IKeyringPair;
@@ -23,7 +29,11 @@ describe('Quartz/Karura XNFT tests', () => {
   };
 
   before(async () => {
-    chains = await AllChains.connect();
+    chains = {
+      relay: await Relay.connect(),
+      quartz: await Quartz.connect(),
+      karura: await Karura.connect(),
+    };
 
     const keyring = new Keyring({type: 'sr25519'});
     alice = keyring.addFromUri('//Alice');
@@ -70,7 +80,7 @@ describe('Quartz/Karura XNFT tests', () => {
     const quartzCollectionId = await chains.quartz.createCollection(alice);
     await chains.karura.registerNonFungibleForeignAsset(
       alice,
-      chains.quartz.xcmNft.collectionAssetId(quartzCollectionId),
+      chains.quartz.xcmNft.assetId(quartzCollectionId),
       `Quartz/Collection(${quartzCollectionId})`,
     );
 
@@ -86,7 +96,7 @@ describe('Quartz/Karura XNFT tests', () => {
         beneficiary: bob.address,
       });
 
-      const karuraDerivativeToken = await chains.karura.derivativeToken(quartzToken);
+      const karuraDerivativeToken = await chains.karura.derivativeTokenOf(quartzToken);
       console.log(`[XNFT] Karura: minted ${karuraDerivativeToken.stringify()} backed by ${quartzToken.stringify()}`);
 
       await quartzToken.checkOwner(sovereignAccount.karura);
@@ -116,7 +126,7 @@ describe('Quartz/Karura XNFT tests', () => {
         beneficiary: charlie.address,
       });
 
-      const karuraDerivativeToken = await chains.karura.derivativeToken(quartzToken);
+      const karuraDerivativeToken = await chains.karura.derivativeTokenOf(quartzToken);
       console.log(`[XNFT] Karura: ${karuraDerivativeToken.stringify()} is backed by ${quartzToken.stringify()}`);
 
       await quartzToken.checkOwner(sovereignAccount.karura);
@@ -143,7 +153,7 @@ describe('Quartz/Karura XNFT tests', () => {
     const karuraCollectionId = await chains.karura.createCollection(alice);
     await chains.quartz.registerForeignAsset(
       alice,
-      chains.karura.xcmNft.collectionAssetId(karuraCollectionId),
+      chains.karura.xcmNft.assetId(karuraCollectionId),
       {
         name: `Karura/Collection(${karuraCollectionId})`,
         tokenPrefix: 'KNFT',
@@ -163,7 +173,7 @@ describe('Quartz/Karura XNFT tests', () => {
         beneficiary: bob.address,
       });
 
-      const quartzDerivativeToken = await chains.quartz.derivativeToken(karuraToken);
+      const quartzDerivativeToken = await chains.quartz.derivativeTokenOf(karuraToken);
       console.log(`[XNFT] Quartz: minted ${quartzDerivativeToken.stringify()} backed by ${karuraToken.stringify()}`);
 
       await karuraToken.checkOwner(sovereignAccount.quartz);
@@ -193,7 +203,7 @@ describe('Quartz/Karura XNFT tests', () => {
         beneficiary: charlie.address,
       });
 
-      const quartzDerivativeToken = await chains.quartz.derivativeToken(karuraToken);
+      const quartzDerivativeToken = await chains.quartz.derivativeTokenOf(karuraToken);
       console.log(`[XNFT] Quartz: ${quartzDerivativeToken.stringify()} is backed by ${karuraToken.stringify()}`);
 
       await karuraToken.checkOwner(sovereignAccount.quartz);
@@ -220,7 +230,7 @@ describe('Quartz/Karura XNFT tests', () => {
     const karuraCollectionId = await chains.karura.createCollection(alice);
     await chains.quartz.registerForeignAsset(
       alice,
-      chains.karura.xcmNft.collectionAssetId(karuraCollectionId),
+      chains.karura.xcmNft.assetId(karuraCollectionId),
       {
         name: `Karura/Collection(${karuraCollectionId})`,
         tokenPrefix: 'KNFT',
@@ -238,7 +248,7 @@ describe('Quartz/Karura XNFT tests', () => {
       beneficiary: bob.address,
     });
 
-    const quartzDerivativeToken = await chains.quartz.derivativeToken(karuraToken);
+    const quartzDerivativeToken = await chains.quartz.derivativeTokenOf(karuraToken);
     console.log(`[XNFT] Quartz: minted ${quartzDerivativeToken.stringify()} backed by ${karuraToken.stringify()}`);
 
     await sendAndWait(
@@ -261,7 +271,7 @@ describe('Quartz/Karura XNFT tests', () => {
     const karuraCollectionId = await chains.karura.createCollection(alice);
     await chains.quartz.registerForeignAsset(
       alice,
-      chains.karura.xcmNft.collectionAssetId(karuraCollectionId),
+      chains.karura.xcmNft.assetId(karuraCollectionId),
       {
         name: `Karura/Collection(${karuraCollectionId})`,
         tokenPrefix: 'KNFT',
@@ -279,7 +289,7 @@ describe('Quartz/Karura XNFT tests', () => {
       beneficiary: bob.address,
     });
 
-    const quartzDerivativeToken = await chains.quartz.derivativeToken(karuraToken);
+    const quartzDerivativeToken = await chains.quartz.derivativeTokenOf(karuraToken);
     console.log(`[XNFT] Quartz: minted ${quartzDerivativeToken.stringify()} backed by ${karuraToken.stringify()}`);
 
     console.log('\t >>> TEST: Quartz attempts to send the derivative as it was the original <<<');
@@ -299,7 +309,7 @@ describe('Quartz/Karura XNFT tests', () => {
     const quartzCollectionId = await chains.quartz.createCollection(alice);
     await chains.karura.registerNonFungibleForeignAsset(
       alice,
-      chains.quartz.xcmNft.collectionAssetId(quartzCollectionId),
+      chains.quartz.xcmNft.assetId(quartzCollectionId),
       `Quartz/Collection(${quartzCollectionId})`,
     );
 
@@ -313,7 +323,7 @@ describe('Quartz/Karura XNFT tests', () => {
       beneficiary: bob.address,
     });
 
-    const karuraDerivativeToken = await chains.karura.derivativeToken(quartzToken);
+    const karuraDerivativeToken = await chains.karura.derivativeTokenOf(quartzToken);
     console.log(`[XNFT] Karura: minted ${karuraDerivativeToken.stringify()} backed by ${quartzToken.stringify()}`);
 
     await sendAndWait(
@@ -337,7 +347,7 @@ describe('Quartz/Karura XNFT tests', () => {
     const quartzCollectionId = await chains.quartz.createCollection(alice);
     await chains.karura.registerNonFungibleForeignAsset(
       alice,
-      chains.quartz.xcmNft.collectionAssetId(quartzCollectionId),
+      chains.quartz.xcmNft.assetId(quartzCollectionId),
       `Quartz/Collection(${quartzCollectionId})`,
     );
 
@@ -351,7 +361,7 @@ describe('Quartz/Karura XNFT tests', () => {
       beneficiary: bob.address,
     });
 
-    const karuraDerivativeToken = await chains.karura.derivativeToken(quartzToken);
+    const karuraDerivativeToken = await chains.karura.derivativeTokenOf(quartzToken);
     console.log(`[XNFT] Karura: minted ${karuraDerivativeToken.stringify()} backed by ${quartzToken.stringify()}`);
 
     console.log('\t >>> TEST: Karura attempts to send the derivative as it was the original <<<');
@@ -366,6 +376,8 @@ describe('Quartz/Karura XNFT tests', () => {
   });
 
   after(async () => {
-    await chains.disconnect();
+    await chains.relay.disconnect();
+    await chains.quartz.disconnect();
+    await chains.karura.disconnect();
   });
 });

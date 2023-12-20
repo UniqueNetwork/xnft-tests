@@ -121,15 +121,19 @@ export class Quartz extends Parachain<number, number> {
     const derivativeCollectionId = await this.api.query.foreignAssets.foreignAssetToCollection(token.assetId())
       .then(data => data.toJSON() as number | null);
 
+    if(derivativeCollectionId == null) {
+      throw Error(`[XNFT] no derivative collection is found for ${token.stringify()} on ${this.name}`);
+    }
+
     const derivativeTokenId = await this.api.query.foreignAssets.foreignReserveAssetInstanceToTokenId(
       derivativeCollectionId,
       token.assetInstance(),
     ).then(data => data.toJSON() as number | null);
 
-    if(derivativeCollectionId != null && derivativeTokenId != null) {
-      return new Token(this, derivativeCollectionId, derivativeTokenId);
-    } else {
-      throw Error(`[XNFT] no derivative was found for ${token.stringify()} on ${this.name}`);
+    if(derivativeTokenId == null) {
+      throw Error(`[XNFT] no derivative token is found for ${token.stringify()} on ${this.name}`);
     }
+
+    return new Token(this, derivativeCollectionId, derivativeTokenId);
   }
 }

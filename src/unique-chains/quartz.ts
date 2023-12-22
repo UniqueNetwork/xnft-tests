@@ -1,17 +1,22 @@
 import {ApiPromise, WsProvider} from '@polkadot/api';
 import {IAssetId, IParachain, Parachain, Token, XTokens} from '../common';
 import {IKeyringPair} from '@polkadot/types/types';
-import {sendAndWait, strUtf16} from '../util';
+import {palletAccount, sendAndWait, strUtf16} from '../util';
 
 const RELAY_QUARTZ_URL = process.env.RELAY_QUARTZ_URL!;
 const RELAY_QUARTZ_ID = +process.env.RELAY_QUARTZ_ID!;
 
 export class Quartz extends Parachain<number, number> {
   xtokens: XTokens<number, number>;
+  foreignAssetsPalletAccount: string;
 
-  private constructor(chain: IParachain<number, number>) {
+  private constructor(
+    chain: IParachain<number, number>,
+    foreignAssetsPalletAccount: string,
+  ) {
     super(chain);
     this.xtokens = new XTokens(this);
+    this.foreignAssetsPalletAccount = foreignAssetsPalletAccount;
   }
 
   static async connect() {
@@ -53,7 +58,9 @@ export class Quartz extends Parachain<number, number> {
       },
     });
 
-    return new Quartz(chain);
+    const foreignAssetsPalletAccount = await palletAccount(api, 'frgnasts');
+
+    return new Quartz(chain, foreignAssetsPalletAccount);
   }
 
   async disconnect() {

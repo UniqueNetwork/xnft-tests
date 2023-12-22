@@ -203,7 +203,7 @@ export const toChainAddressFormat = async (api: ApiPromise, address: string | Ui
   return encodeAddress(address, ss58Format);
 };
 
-export const palletSubAccount = async (api: ApiPromise, palletId: string, sub: number) => {
+export const palletAccount = async (api: ApiPromise, palletId: string, sub: number = 0) => {
   if(palletId.length == 8) {
     const palletIdEncoded = stringToU8a(('modl' + palletId));
     const subEncoded = nToU8a(sub);

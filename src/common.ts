@@ -53,19 +53,19 @@ export type IAssetInstance = 'Undefined' | {
 export type IInterior = 'Here' | {
   X1: IJunction
 } | {
-  X2: IJunction[]
+  X2: [IJunction, IJunction]
 } | {
-  X3: IJunction[]
+  X3: [IJunction, IJunction, IJunction]
 } | {
-  X4: IJunction[]
+  X4: [IJunction, IJunction, IJunction, IJunction]
 } | {
-  X5: IJunction[]
+  X5: [IJunction, IJunction, IJunction, IJunction, IJunction]
 } | {
-  X6: IJunction[]
+  X6: [IJunction, IJunction, IJunction, IJunction, IJunction, IJunction]
 } | {
-  X7: IJunction[]
+  X7: [IJunction, IJunction, IJunction, IJunction, IJunction, IJunction, IJunction]
 } | {
-  X8: IJunction[]
+  X8: [IJunction, IJunction, IJunction, IJunction, IJunction, IJunction, IJunction, IJunction]
 };
 
 export type IJunction =
@@ -76,8 +76,10 @@ export type IJunction =
   | IJunctionGeneralIndex;
 
 export interface IJunctionAccountId32 {
-  network: string | null,
-  id: Uint8Array,
+  AccountId32: {
+    network: string | null,
+    id: Uint8Array,
+  }
 }
 
 export interface IJunctionParachain {
@@ -148,29 +150,29 @@ export class Parachain<CollectionId, TokenId> implements IParachain<CollectionId
     this.xcmNft = chain.xcmNft;
   }
 
-  protected static async connectParachain<CollectionId, TokenId>(args: {
+  protected static async connectParachain<CollectionId, TokenId>(ctx: {
     api: ApiPromise,
     paraId: number,
     name: string,
     nativeCurrencyId: IAssetId | 'SelfLocation',
     xcmNft: IXcmNft<CollectionId, TokenId>,
   }) {
-    const api = args.api;
+    const api = ctx.api;
     const nativeCurrencyInfo = await chainNativeCurrencyInfo(api);
     const nativeCurrencyAmount = (value: number) => adjustToDecimals(value, nativeCurrencyInfo.decimals);
-    const parachainLocation = parachainMultilocation(args.paraId);
+    const parachainLocation = parachainMultilocation(ctx.paraId);
 
-    const nativeCurrencyId = args.nativeCurrencyId == 'SelfLocation'
+    const nativeCurrencyId = ctx.nativeCurrencyId == 'SelfLocation'
       ? {Concrete: parachainLocation}
-      : args.nativeCurrencyId;
+      : ctx.nativeCurrencyId;
 
     const chain: IParachain<CollectionId, TokenId> = {
       api,
-      paraId: args.paraId,
-      name: args.name,
+      paraId: ctx.paraId,
+      name: ctx.name,
       locations: {
         self: parachainLocation,
-        account: parachainAccountMultilocation(args.paraId),
+        account: parachainAccountMultilocation(ctx.paraId),
         paraSovereignAccount: (paraId: number) => paraSiblingSovereignAccount(api, paraId),
       },
       nativeCurrency: {
@@ -182,7 +184,7 @@ export class Parachain<CollectionId, TokenId> implements IParachain<CollectionId
         }),
         ...nativeCurrencyInfo,
       },
-      xcmNft: args.xcmNft,
+      xcmNft: ctx.xcmNft,
     };
 
     return chain;
@@ -221,8 +223,10 @@ export class Relay implements IChain {
           parents: 0,
           interior: {
             X1: {
-              network: null,
-              id: address,
+              AccountId32: {
+                network: null,
+                id: address,
+              },
             },
           },
         }),
@@ -321,7 +325,7 @@ export class XTokens<CollectionId, TokenId> {
     this.chain = chain;
   }
 
-  async transferXnftWithFee(args: {
+  async transferXnftWithFee(ctx: {
     signer: IKeyringPair,
     token: Token<CollectionId, TokenId>,
     fee: IMultiAsset,
@@ -329,16 +333,16 @@ export class XTokens<CollectionId, TokenId> {
     beneficiary: string,
   }) {
     const xnft = {
-      V3: args.token.asMultiasset(),
+      V3: ctx.token.asMultiasset(),
     };
     const fee = {
-      V3: args.fee,
+      V3: ctx.fee,
     };
 
-    const beneficiaryRaw = decodeAddress(args.beneficiary);
-    const dest = {V3: args.destChain.locations.account(beneficiaryRaw)};
+    const beneficiaryRaw = decodeAddress(ctx.beneficiary);
+    const dest = {V3: ctx.destChain.locations.account(beneficiaryRaw)};
     const messageHash = await sendAndWait(
-      args.signer,
+      ctx.signer,
       this.chain.api.tx.xTokens.transferMultiassetWithFee(
         xnft,
         fee,
@@ -349,10 +353,10 @@ export class XTokens<CollectionId, TokenId> {
       .then(result => result.extractEvents('xcmpQueue.XcmpMessageSent'))
       .then(events => events[0].data[0].toString());
 
-    console.log(`[XNFT] ${args.token.stringify()} is sent: ${this.chain.name} -> ${args.destChain.name}/Account(${args.beneficiary})`);
+    console.log(`[XNFT] ${ctx.token.stringify()} is sent: ${this.chain.name} -> ${ctx.destChain.name}/Account(${ctx.beneficiary})`);
     console.log(`\t... message hash: ${messageHash}`);
 
-    await expectXcmpQueueSuccess(args.destChain, messageHash);
+    await expectXcmpQueueSuccess(ctx.destChain, messageHash);
   }
 }
 

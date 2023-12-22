@@ -113,6 +113,9 @@ describe('Quartz/Karura XNFT tests', () => {
         beneficiary: alice.address,
       });
 
+      const karuraDerivativeToken = await chains.karura.derivativeTokenOf(quartzToken);
+
+      await karuraDerivativeToken.checkOwner(chains.karura.xnftPalletAccount);
       await quartzToken.checkOwner(alice.address);
     }
 
@@ -143,6 +146,9 @@ describe('Quartz/Karura XNFT tests', () => {
         beneficiary: dave.address,
       });
 
+      const karuraDerivativeToken = await chains.karura.derivativeTokenOf(quartzToken);
+
+      await karuraDerivativeToken.checkOwner(chains.karura.xnftPalletAccount);
       await quartzToken.checkOwner(dave.address);
     }
   });
@@ -190,6 +196,9 @@ describe('Quartz/Karura XNFT tests', () => {
         beneficiary: alice.address,
       });
 
+      const quartzDerivativeToken = await chains.quartz.derivativeTokenOf(karuraToken);
+
+      await quartzDerivativeToken.checkOwner(chains.quartz.foreignAssetsPalletAccount);
       await karuraToken.checkOwner(alice.address);
     }
 
@@ -220,6 +229,9 @@ describe('Quartz/Karura XNFT tests', () => {
         beneficiary: dave.address,
       });
 
+      const quartzDerivativeToken = await chains.quartz.derivativeTokenOf(karuraToken);
+
+      await quartzDerivativeToken.checkOwner(chains.quartz.foreignAssetsPalletAccount);
       await karuraToken.checkOwner(dave.address);
     }
   });

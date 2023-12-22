@@ -1,6 +1,6 @@
 import {ApiPromise, WsProvider} from '@polkadot/api';
 import {IAssetId, IMultilocation, IParachain, Parachain, Token, XTokens} from '../common';
-import {palletSubAccount, sendAndWait, toChainAddressFormat} from '../util';
+import {palletAccount, sendAndWait, toChainAddressFormat} from '../util';
 import {IKeyringPair} from '@polkadot/types/types';
 import {hexToString} from '@polkadot/util';
 
@@ -9,10 +9,12 @@ const RELAY_KARURA_ID = +process.env.RELAY_KARURA_ID!;
 
 export class Karura extends Parachain<number, number> {
   xtokens: XTokens<number, number>;
+  xnftPalletAccount: string;
 
-  private constructor(chain: IParachain<number, number>) {
+  private constructor(chain: IParachain<number, number>, xnftPalletAccount: string) {
     super(chain);
     this.xtokens = new XTokens(this);
+    this.xnftPalletAccount = xnftPalletAccount;
   }
 
   static async connect() {
@@ -74,7 +76,9 @@ export class Karura extends Parachain<number, number> {
       },
     });
 
-    return new Karura(chain);
+    const xnftPalletAccount = await palletAccount(api, 'aca/xNFT');
+
+    return new Karura(chain, xnftPalletAccount);
   }
 
   async disconnect() {
@@ -134,7 +138,7 @@ export class Karura extends Parachain<number, number> {
       .then(result => result.extractEvents('nft.CreatedClass'))
       .then(events => events[0].data[1].toJSON() as number);
 
-    const collectionAccount = await palletSubAccount(this.api, 'aca/aNFT', collectionId);
+    const collectionAccount = await palletAccount(this.api, 'aca/aNFT', collectionId);
 
     console.log(`[XNFT] ${this.name}: created "${this.name}/Collection(${collectionId})"`);
     console.log(`\t... the collection account: ${collectionAccount}`);
@@ -147,7 +151,7 @@ export class Karura extends Parachain<number, number> {
 
   async mintToken(signer: IKeyringPair, collectionId: number, owner: string) {
     const tokenId = (await this.api.query.ormlNFT.nextTokenId(collectionId)).toJSON() as number;
-    const collectionAccount = await palletSubAccount(this.api, 'aca/aNFT', collectionId);
+    const collectionAccount = await palletAccount(this.api, 'aca/aNFT', collectionId);
     const emptyAttributes = this.api.createType('BTreeMap<Bytes, Bytes>', {});
 
     await sendAndWait(signer, this.api.tx.proxy.proxy(

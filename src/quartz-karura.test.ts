@@ -63,13 +63,13 @@ describe('Quartz/Karura XNFT tests', () => {
       },
     );
 
-    await chains.quartz.registerForeignAsset(
+    await chains.quartz.registerFungibleForeignAsset(
       alice,
       chains.karura.nativeCurrency.id,
       {
         name: chains.karura.name,
         tokenPrefix: chains.karura.nativeCurrency.symbol,
-        mode: {Fungible: chains.karura.nativeCurrency.decimals},
+        decimals: chains.karura.nativeCurrency.decimals,
       },
     );
   });
@@ -157,13 +157,12 @@ describe('Quartz/Karura XNFT tests', () => {
     console.log('=== transferring Karura NFT between Quartz and Karura ===');
 
     const karuraCollectionId = await chains.karura.createCollection(alice);
-    await chains.quartz.registerForeignAsset(
+    await chains.quartz.registerNftForeignAsset(
       alice,
       chains.karura.xcmNft.assetId(karuraCollectionId),
       {
         name: `Karura/Collection(${karuraCollectionId})`,
         tokenPrefix: 'KNFT',
-        mode: 'NFT',
       },
     );
 
@@ -240,13 +239,12 @@ describe('Quartz/Karura XNFT tests', () => {
     console.log('=== transfer derivative of Karura NFT within Quartz using native API ===');
 
     const karuraCollectionId = await chains.karura.createCollection(alice);
-    await chains.quartz.registerForeignAsset(
+    await chains.quartz.registerNftForeignAsset(
       alice,
       chains.karura.xcmNft.assetId(karuraCollectionId),
       {
         name: `Karura/Collection(${karuraCollectionId})`,
         tokenPrefix: 'KNFT',
-        mode: 'NFT',
       },
     );
 
@@ -281,13 +279,12 @@ describe('Quartz/Karura XNFT tests', () => {
     console.log('=== Quartz cannot act as the reserve for the derivative of Karura NFT ===');
 
     const karuraCollectionId = await chains.karura.createCollection(alice);
-    await chains.quartz.registerForeignAsset(
+    await chains.quartz.registerNftForeignAsset(
       alice,
       chains.karura.xcmNft.assetId(karuraCollectionId),
       {
         name: `Karura/Collection(${karuraCollectionId})`,
         tokenPrefix: 'KNFT',
-        mode: 'NFT',
       },
     );
 

@@ -1,7 +1,6 @@
 #!/bin/sh
 set -e
 
-[[ -e baedeker ]] || (curl -L https://github.com/UniqueNetwork/baedeker/releases/download/v0.1.0-rc1/baedeker -o baedeker && chmod +x baedeker)
 [[ -e vendor/baedeker-library ]] || (mkdir -p vendor && git clone https://github.com/UniqueNetwork/baedeker-library vendor/baedeker-library)
 
 BDK_DIR=$(dirname $(readlink -f "$0"))

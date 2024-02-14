@@ -1,18 +1,19 @@
 {
 	"compilerOptions": {
-		"target": "ES2020",
-		"moduleResolution": "node",
+		"target": "ES2022",
+		"lib": ["ESNext"],
+		"moduleResolution": "Bundler",
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
-		"module": "ESNext",
+		"module": "ES2022",
 		"sourceMap": true,
-		"outDir": "dist",
-		"strict": true
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"strict": true,
 	},
 	"include": [
 		"./src/*",
 		"./src/unique-chains/*",
 		"./src/acala-chains/*",
 	],
-	"lib": ["es2017"],
 }

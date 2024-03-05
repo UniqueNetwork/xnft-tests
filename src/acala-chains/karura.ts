@@ -131,7 +131,7 @@ export class Karura extends Parachain<number, number> {
     const enableAllCollectionFeatures = 0xF;
     const emptyAttributes = this.api.createType('BTreeMap<Bytes, Bytes>', {});
     const collectionId = await sendAndWait(signer, this.api.tx.nft.createClass(
-      'xNFT Collection',
+      'Example Local Collection',
       enableAllCollectionFeatures,
       emptyAttributes,
     ))

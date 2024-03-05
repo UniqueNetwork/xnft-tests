@@ -130,7 +130,7 @@ export class Quartz extends Parachain<number, number> {
   async createCollection(signer: IKeyringPair) {
     const collectionId = await sendAndWait(signer, this.api.tx.unique.createCollectionEx({
       mode: 'NFT',
-      tokenPrefix: 'xNFT',
+      tokenPrefix: 'XMPL',
     }))
       .then(data => data.extractEvents('common.CollectionCreated'))
       .then(events => events[0].data[0].toJSON() as number);

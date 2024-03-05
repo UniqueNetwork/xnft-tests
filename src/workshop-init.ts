@@ -42,6 +42,21 @@ async function init() {
     },
   );
 
+  const quartzCollectionId = await chains.quartz.createCollection(alice);
+  await chains.karura.registerNonFungibleForeignAsset(
+    alice,
+    chains.quartz.xcmNft.assetId(quartzCollectionId),
+    `Quartz/Collection(${quartzCollectionId})`,
+  );
+  await chains.quartz.mintToken(alice, quartzCollectionId, alice.address);
+  await chains.quartz.mintToken(alice, quartzCollectionId, alice.address);
+  await chains.quartz.mintToken(alice, quartzCollectionId, alice.address);
+
+  const karuraCollectionId = await chains.karura.createCollection(alice);
+  await chains.karura.mintToken(alice, karuraCollectionId, alice.address);
+  await chains.karura.mintToken(alice, karuraCollectionId, alice.address);
+  await chains.karura.mintToken(alice, karuraCollectionId, alice.address);
+
   await chains.relay.disconnect();
   await chains.quartz.disconnect();
   await chains.karura.disconnect();

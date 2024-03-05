@@ -56,6 +56,10 @@ local relay = {
 		chain: relay_spec,
 		modify:: m.genericRelay($),
 	}},
+	parachains: {
+		[para.name]: para,
+		for para in [quartz, karura]
+	},
 	nodes: {
 		[name]: {
 			bin: $.bin,
@@ -65,9 +69,4 @@ local relay = {
 	},
 };
 
-relay + {
-	parachains: {
-		[para.name]: para,
-		for para in [quartz, karura]
-	},
-}
+relay

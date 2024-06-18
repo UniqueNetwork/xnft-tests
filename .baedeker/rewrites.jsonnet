@@ -7,7 +7,7 @@ local dotenv = {
 
 function(prev, repoDir)
 (import 'baedeker-library/ops/rewrites.libsonnet').rewriteNodePaths({
-	'bin/polkadot':{dockerImage:'uniquenetwork/builder-polkadot:%s' % dotenv.RELAY_POLKADOT_BRANCH},
+	'bin/polkadot':{dockerImage:'parity/polkadot:%s' % dotenv.RELAY_POLKADOT_BRANCH},
 	'bin/quartz':dotenv.QUARTZ_BINARY,
-	'bin/karura':dotenv.KARURA_BINARY,
+	'bin/karura':{dockerImage:'acala/karura-node:%s' % dotenv.RELAY_POLKADOT_BRANCH},
 })(prev)

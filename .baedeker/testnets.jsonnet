@@ -16,6 +16,7 @@ local relay = {
 		[name]: {
 			bin: $.bin,
 			wantedKeys: 'relay',
+			expectedDataPath: '/parity',
 		},
 		for name in ['alice', 'bob', 'charlie', 'dave', 'eve', 'ferdie']
 	},
@@ -32,7 +33,6 @@ local quartz = {
 		[name]: {
 			bin: $.bin,
 			wantedKeys: 'para',
-
 			extraArgs: [
 				"-lxcm=trace"
 			],
@@ -49,14 +49,13 @@ local karura = {
 		chain: 'karura-dev',
 		modify:: bdk.mixer([
 			m.genericPara($),
-			function(prev) prev {id+: '-local'},
 		]),
 	}},
 	nodes: {
 		[name]: {
 			bin: $.bin,
 			wantedKeys: 'para',
-
+                        expectedDataPath: '/acala',
 			extraArgs: [
 				"-lxcm=trace"
 			],

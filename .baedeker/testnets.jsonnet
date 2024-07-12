@@ -17,9 +17,6 @@ function(relay_spec)
         bin: $.bin,
         wantedKeys: 'relay',
         expectedDataPath: '/parity',
-        extraArgs: [
-          '--insecure-validator-i-know-what-i-do',
-        ],
       }
       for name in ['alice', 'bob', 'charlie', 'dave', 'eve', 'ferdie']
     },
@@ -38,6 +35,7 @@ function(relay_spec)
         wantedKeys: 'para',
         extraArgs: [
           '-lxcm=trace',
+          '--increase-future-pool',
         ],
       }
       for name in ['alice', 'bob']
